@@ -1,15 +1,306 @@
+@import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:wght@400;700&family=Inter:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 :root {
-  --color-blue:    #1a56db;
-  --color-blue-hover: #1a44b8;
-  --color-border:  #e5e7eb;
-  --color-muted:   #6b7280;
-  --color-danger:  #dc2626;
+  --paper:    #fafaf8;
+  --ink:      #1a1a1a;
+  --pencil:   #4a4a4a;
+  --rule:     #e8e8e4;
+  --offwhite: #f5f5f2;
+  --color-blue:      #1a56db;
+  --color-blue-hover:#1a44b8;
+  --color-border:    #e5e7eb;
+  --color-muted:     #6b7280;
+  --color-danger:    #dc2626;
 }
 
+*, *::before, *::after { box-sizing: border-box; }
+
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #f9fafb;
-  color: #111827;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #1a1a1a;
+  background: #fafaf8;
+  margin: 0;
+}
+
+/* ─── Landing — Nav ─── */
+.ln-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #fff;
+  border-bottom: 1px solid var(--rule);
+}
+.ln-nav-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ln-logo {
+  font-family: 'Special Elite', cursive;
+  font-size: 18px;
+  color: var(--ink);
+  letter-spacing: 0.5px;
+  text-decoration: none;
+}
+.ln-nav-links { display: flex; align-items: center; gap: 20px; }
+.ln-nav-login {
+  font-size: 14px;
+  color: var(--pencil);
+  text-decoration: none;
+}
+.ln-nav-login:hover { color: var(--ink); }
+.ln-nav-cta {
+  font-family: 'Courier Prime', monospace;
+  font-size: 14px;
+  color: #fff;
+  background: var(--ink);
+  text-decoration: none;
+  padding: 8px 18px;
+  border: 1.5px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: box-shadow 0.1s, transform 0.1s;
+}
+.ln-nav-cta:hover { box-shadow: 1px 1px 0 var(--ink); transform: translate(2px,2px); }
+
+/* ─── Landing — Hero ─── */
+.ln-hero {
+  background-color: var(--paper);
+  background-image:
+    repeating-linear-gradient(transparent, transparent 31px, #e8e8e4 31px, #e8e8e4 32px),
+    repeating-linear-gradient(90deg, transparent, transparent 99%, rgba(0,0,0,.04) 100%);
+  background-size: 100% 32px, 32px 100%;
+}
+.ln-hero-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 80px 24px 88px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 48px;
+  align-items: center;
+}
+.ln-hero-content { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; }
+.ln-hero-label {
+  font-family: 'Courier Prime', monospace;
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 4px 10px;
+  display: inline-block;
+}
+.ln-hero-headline {
+  font-family: 'Special Elite', cursive;
+  font-size: clamp(36px, 6vw, 64px);
+  line-height: 1.15;
+  color: var(--ink);
+  margin: 0;
+}
+.ln-hero-sub {
+  font-size: 18px;
+  color: var(--pencil);
+  line-height: 1.6;
+  max-width: 520px;
+  margin: 0;
+}
+.ln-cta {
+  font-family: 'Courier Prime', monospace;
+  font-size: 16px;
+  color: #fff;
+  background: var(--ink);
+  text-decoration: none;
+  padding: 14px 32px;
+  border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--pencil);
+  display: inline-block;
+  transition: box-shadow 0.1s, transform 0.1s;
+}
+.ln-cta:hover { box-shadow: 2px 2px 0 var(--pencil); transform: translate(2px,2px); }
+.ln-hero-price {
+  font-family: 'Courier Prime', monospace;
+  font-size: 13px;
+  color: var(--pencil);
+  margin: 0;
+}
+
+/* ─── Landing — Ledger art ─── */
+.ln-ledger {
+  font-family: 'Courier Prime', monospace;
+  font-size: 13px;
+  color: var(--ink);
+  background-image: repeating-linear-gradient(transparent, transparent 31px, #e8e8e4 31px, #e8e8e4 32px);
+  background-size: 100% 32px;
+  border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  padding: 20px 24px;
+  width: 260px;
+  transform: rotate(1.5deg);
+  flex-shrink: 0;
+}
+.ln-ledger-header {
+  font-weight: 700;
+  letter-spacing: 3px;
+  font-size: 11px;
+  text-align: center;
+  margin-bottom: 16px;
+  border-bottom: 1.5px solid var(--ink);
+  padding-bottom: 8px;
+}
+.ln-ledger-row { display: flex; justify-content: space-between; padding: 6px 0; }
+.ln-ledger-divider { border-top: 1px solid var(--ink); margin: 6px 0; }
+.ln-ledger-total { display: flex; justify-content: space-between; padding: 6px 0; font-weight: 700; }
+
+/* ─── Landing — Sections shared ─── */
+.ln-section-inner { max-width: 900px; margin: 0 auto; padding: 72px 24px; }
+.ln-section-label {
+  font-family: 'Courier Prime', monospace;
+  font-size: 11px;
+  letter-spacing: 4px;
+  text-align: center;
+  color: var(--pencil);
+  margin: 0 0 48px;
+  text-transform: uppercase;
+}
+
+/* ─── Landing — Audience cards ─── */
+.ln-audience { background: #fff; }
+.ln-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
+.ln-card {
+  border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  padding: 28px 24px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ln-card-index { font-family: 'Courier Prime', monospace; font-size: 11px; color: #ccc; letter-spacing: 1px; }
+.ln-card-title { font-family: 'Special Elite', cursive; font-size: 20px; color: var(--ink); margin: 0; }
+.ln-card-sub { font-family: 'Courier Prime', monospace; font-size: 12px; color: var(--pencil); margin: 0; letter-spacing: 1px; }
+.ln-card-desc { font-size: 14px; color: var(--pencil); line-height: 1.6; margin: 4px 0 0; }
+
+/* ─── Landing — Features ─── */
+.ln-features {
+  background-image: repeating-linear-gradient(transparent, transparent 31px, #e8e8e4 31px, #e8e8e4 32px);
+  background-size: 100% 32px;
+  background-color: var(--offwhite);
+}
+.ln-features-title {
+  font-family: 'Special Elite', cursive;
+  font-size: 32px;
+  color: var(--ink);
+  margin: 0 0 48px;
+  border-bottom: 2px dashed var(--ink);
+  padding-bottom: 8px;
+  display: inline-block;
+}
+.ln-feature-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 24px; }
+.ln-feature-inner { border-left: 2px solid var(--ink); padding-left: 16px; }
+.ln-feature-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+  margin: 0 0 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.ln-feature-prefix { font-family: 'Courier Prime', monospace; font-weight: 700; flex-shrink: 0; }
+.ln-feature-desc { font-size: 14px; color: var(--pencil); line-height: 1.6; margin: 0; }
+
+/* ─── Landing — Pricing ─── */
+.ln-pricing { background: #fff; }
+.ln-pricing-card {
+  border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  padding: 40px 36px;
+  max-width: 360px;
+  margin: 0 auto;
+  transform: rotate(-0.5deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background: #fff;
+}
+.ln-pricing-plan { font-family: 'Courier Prime', monospace; font-size: 11px; letter-spacing: 4px; color: var(--pencil); text-transform: uppercase; margin: 0; }
+.ln-pricing-amount { display: flex; align-items: baseline; gap: 8px; line-height: 1; }
+.ln-pricing-number { font-family: 'Courier Prime', monospace; font-size: 64px; font-weight: 700; letter-spacing: -2px; color: var(--ink); line-height: 1; }
+.ln-pricing-per { font-family: 'Courier Prime', monospace; font-size: 18px; color: var(--pencil); }
+.ln-pricing-divider { width: 100%; border-top: 2px dashed var(--ink); }
+.ln-pricing-list { list-style: none; padding: 0; margin: 0; width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.ln-pricing-list li { font-size: 14px; color: var(--ink); display: flex; align-items: baseline; gap: 10px; line-height: 1.5; }
+.ln-check { font-family: 'Courier Prime', monospace; font-weight: 700; flex-shrink: 0; }
+.ln-pricing-note { font-size: 13px; color: var(--pencil); margin: 0; text-align: center; }
+
+/* ─── Landing — Footer ─── */
+.ln-footer { background: var(--ink); color: #fff; }
+.ln-footer-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 24px 24px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 24px;
+  align-items: center;
+}
+.ln-footer-logo { font-family: 'Special Elite', cursive; font-size: 16px; color: #fff; text-decoration: none; }
+.ln-footer-tagline { font-size: 13px; color: rgba(255,255,255,.65); text-align: center; margin: 0; line-height: 1.5; }
+.ln-footer-links { display: flex; gap: 20px; }
+.ln-footer-link { font-family: 'Courier Prime', monospace; font-size: 13px; color: rgba(255,255,255,.75); text-decoration: none; }
+.ln-footer-link:hover { color: #fff; }
+.ln-footer-legal { max-width: 900px; margin: 0 auto; padding: 0 24px 16px; display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+.ln-footer-bottom {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255,255,255,.12);
+  font-family: 'Courier Prime', monospace;
+  font-size: 12px;
+  color: rgba(255,255,255,.4);
+  text-align: center;
+}
+
+/* ─── Legal pages ─── */
+.legal-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+  line-height: 1.7;
+}
+.legal-page h1 { font-family: 'Special Elite', cursive; font-size: 32px; color: var(--ink); margin: 0 0 8px; }
+.legal-page h2 { font-family: 'Special Elite', cursive; font-size: 20px; color: var(--ink); margin: 32px 0 8px; }
+.legal-page p, .legal-page li { font-size: 15px; color: var(--pencil); }
+.legal-page ul { padding-left: 20px; }
+.legal-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 13px;
+  color: var(--pencil);
+  text-decoration: none;
+  margin-bottom: 32px;
+}
+.legal-back:hover { color: var(--ink); }
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+  .ln-nav-login { display: none; }
+  .ln-hero-inner { grid-template-columns: 1fr; padding: 56px 24px 64px; }
+  .ln-ledger { display: none; }
+  .ln-cards { grid-template-columns: 1fr; }
+  .ln-feature-grid { grid-template-columns: 1fr; }
+  .ln-pricing-card { max-width: 100%; transform: none; }
+  .ln-footer-inner { grid-template-columns: 1fr; text-align: center; }
+  .ln-footer-links { justify-content: center; }
 }
