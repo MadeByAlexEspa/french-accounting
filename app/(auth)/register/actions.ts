@@ -9,16 +9,17 @@ export async function register(params: {
   slug: string
 }) {
   const { email, password, companyName, slug } = params
-
-  // Sign up server-side so the SSR client sets the session cookie for the redirect
-  const supabase = await createClient()
-  const { data: authData, error: signUpError } = await supabase.auth.signUp({ email, password })
-
-  if (signUpError) return { error: signUpError.message }
-  if (!authData.user) return { error: 'Erreur lors de la création du compte' }
-
-  // Service role bypasses RLS — no chicken-and-egg with memberships
   const service = createServiceClient()
+
+  // Admin API creates the user synchronously — no phantom IDs, no race condition
+  const { data: adminData, error: adminError } = await service.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true, // auto-confirm so the user can sign in immediately
+  })
+
+  if (adminError) return { error: adminError.message }
+  if (!adminData.user) return { error: 'Erreur lors de la création du compte' }
 
   const { data: workspace, error: wsError } = await service
     .from('workspaces')
@@ -30,12 +31,13 @@ export async function register(params: {
 
   const { error: memberError } = await service
     .from('memberships')
-    .insert({ workspace_id: workspace.id, user_id: authData.user.id, role: 'owner' })
+    .insert({ workspace_id: workspace.id, user_id: adminData.user.id, role: 'owner' })
 
   if (memberError) return { error: memberError.message }
 
-  // If email confirmation is required, session will be null — signal the caller
-  if (!authData.session) return { success: true, needsConfirmation: true }
+  // Establish session server-side so the redirect to /transactions works
+  const supabase = await createClient()
+  await supabase.auth.signInWithPassword({ email, password })
 
-  return { success: true, needsConfirmation: false }
+  return { success: true }
 }
