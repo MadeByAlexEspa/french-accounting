@@ -41,17 +41,20 @@ export default function WorkspacePage() {
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    setUserId(user.id)
-    const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
-    if (!m) return
-    const { data: workspace, error: we } = await supabase.from('workspaces').select('*').eq('id', m.workspace_id).single()
-    if (we || !workspace) { setError(we?.message ?? 'Erreur'); setLoading(false); return }
-    const { data: members } = await supabase.from('memberships').select('id, user_id, role, created_at').eq('workspace_id', m.workspace_id)
-    setWs({ ...workspace, members: members ?? [] } as WorkspaceData)
-    setLoading(false)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setError('Session expirée — rechargez la page.'); return }
+      setUserId(user.id)
+      const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
+      if (!m) { setError('Workspace introuvable.'); return }
+      const { data: workspace, error: we } = await supabase.from('workspaces').select('*').eq('id', m.workspace_id).single()
+      if (we || !workspace) { setError(we?.message ?? 'Erreur'); return }
+      const { data: members } = await supabase.from('memberships').select('id, user_id, role, created_at').eq('workspace_id', m.workspace_id)
+      setWs({ ...workspace, members: members ?? [] } as WorkspaceData)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])

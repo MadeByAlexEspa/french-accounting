@@ -177,18 +177,26 @@ export default function TransactionsPage() {
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
-    if (!m) return
-    setWorkspaceId(m.workspace_id)
-    const [{ data: f, error: fe }, { data: d, error: de }] = await Promise.all([
-      supabase.from('factures').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(200),
-      supabase.from('depenses').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(200),
-    ])
-    if (fe || de) setError((fe ?? de)?.message ?? 'Erreur')
-    setFactures((f ?? []) as Facture[]); setDepenses((d ?? []) as Depense[]); setLoading(false)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setError('Session expirée — rechargez la page.'); return }
+
+      const { data: m, error: me } = await supabase
+        .from('memberships').select('workspace_id').eq('user_id', user.id).single()
+      if (me || !m) { setError('Workspace introuvable.'); return }
+
+      setWorkspaceId(m.workspace_id)
+      const [{ data: f, error: fe }, { data: d, error: de }] = await Promise.all([
+        supabase.from('factures').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(200),
+        supabase.from('depenses').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(200),
+      ])
+      if (fe || de) { setError((fe ?? de)?.message ?? 'Erreur de chargement'); return }
+      setFactures((f ?? []) as Facture[])
+      setDepenses((d ?? []) as Depense[])
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])

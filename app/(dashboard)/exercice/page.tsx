@@ -55,16 +55,20 @@ export default function ExercicePage() {
     const supabase = createClient()
     async function load() {
       setLoading(true); setError(null)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
-      if (!m) return
-      const [{ data: f, error: fe }, { data: d, error: de }] = await Promise.all([
-        supabase.from('factures').select('*').eq('workspace_id', m.workspace_id),
-        supabase.from('depenses').select('*').eq('workspace_id', m.workspace_id),
-      ])
-      if (fe || de) setError((fe ?? de)?.message ?? 'Erreur')
-      setFactures((f ?? []) as Facture[]); setDepenses((d ?? []) as Depense[]); setLoading(false)
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { setError('Session expirée — rechargez la page.'); return }
+        const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
+        if (!m) { setError('Workspace introuvable.'); return }
+        const [{ data: f, error: fe }, { data: d, error: de }] = await Promise.all([
+          supabase.from('factures').select('*').eq('workspace_id', m.workspace_id),
+          supabase.from('depenses').select('*').eq('workspace_id', m.workspace_id),
+        ])
+        if (fe || de) { setError((fe ?? de)?.message ?? 'Erreur'); return }
+        setFactures((f ?? []) as Facture[]); setDepenses((d ?? []) as Depense[])
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [])

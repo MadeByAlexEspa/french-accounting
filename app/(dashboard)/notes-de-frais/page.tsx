@@ -39,17 +39,20 @@ export default function NotesDefraisPage() {
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
-    if (!m) return
-    setWorkspaceId(m.workspace_id)
-    const { data: d, error: de } = await supabase.from('depenses').select('*')
-      .eq('workspace_id', m.workspace_id).not('bank_source', 'is', null).order('date', { ascending: false })
-    if (de) setError(de.message)
-    setDepenses((d ?? []) as Depense[])
-    setLoading(false)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setError('Session expirée — rechargez la page.'); return }
+      const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
+      if (!m) { setError('Workspace introuvable.'); return }
+      setWorkspaceId(m.workspace_id)
+      const { data: d, error: de } = await supabase.from('depenses').select('*')
+        .eq('workspace_id', m.workspace_id).not('bank_source', 'is', null).order('date', { ascending: false })
+      if (de) { setError(de.message); return }
+      setDepenses((d ?? []) as Depense[])
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])
