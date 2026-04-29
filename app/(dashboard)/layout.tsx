@@ -1,6 +1,13 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/Sidebar'
+import type { Workspace } from '@/lib/types/database'
+
+type MembershipWithWorkspace = {
+  workspace_id: string
+  role: string
+  workspaces: Pick<Workspace, 'id' | 'name' | 'slug' | 'activite_type' | 'structure_type'> | Pick<Workspace, 'id' | 'name' | 'slug' | 'activite_type' | 'structure_type'>[] | null
+}
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -8,13 +15,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!user) redirect('/login')
 
-  // Récupère le workspace de l'utilisateur
-  const { data: membership } = await supabase
+  const { data: raw } = await supabase
     .from('memberships')
     .select('workspace_id, role, workspaces(id, name, slug, activite_type, structure_type)')
     .eq('user_id', user.id)
     .single()
 
+  const membership = raw as MembershipWithWorkspace | null
   if (!membership) redirect('/login')
 
   const workspace = Array.isArray(membership.workspaces)

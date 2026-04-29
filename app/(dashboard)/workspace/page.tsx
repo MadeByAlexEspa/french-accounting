@@ -1,17 +1,24 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import type { Workspace } from '@/lib/types/database'
+
+type MembershipWithWorkspace = {
+  role: string
+  workspaces: Workspace | Workspace[] | null
+}
 
 export default async function WorkspacePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: membership } = await supabase
+  const { data: raw } = await supabase
     .from('memberships')
     .select('role, workspaces(id, name, slug, activite_type, structure_type, created_at)')
     .eq('user_id', user.id)
     .single()
 
+  const membership = raw as MembershipWithWorkspace | null
   const workspace = Array.isArray(membership?.workspaces)
     ? membership.workspaces[0]
     : membership?.workspaces

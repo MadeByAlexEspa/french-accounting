@@ -29,6 +29,15 @@ export interface Database {
         }
         Insert: Omit<Database['public']['Tables']['memberships']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['memberships']['Insert']>
+        Relationships: [
+          {
+            foreignKeyName: 'memberships_workspace_id_fkey'
+            columns: ['workspace_id']
+            isOneToOne: false
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
+          }
+        ]
       }
       factures: {
         Row: {
