@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -29,54 +30,95 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Connexion</h1>
-      <p className="text-sm text-gray-500 mb-6">Accédez à votre espace comptable</p>
+    <div className="auth-split">
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-sm font-semibold text-gray-700">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            className="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="vous@exemple.com"
-          />
-        </div>
+      {/* ── Left — branding ── */}
+      <div className="auth-left">
+        <Link href="/" className="auth-left-logo">📝 Compte-Pote</Link>
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="password" className="text-sm font-semibold text-gray-700">
-            Mot de passe
-          </label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
-
-        {error && (
-          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            {error}
+        <div className="auth-left-body">
+          <h1 className="auth-left-headline">
+            La comptabilité<br />sans les complications.
+          </h1>
+          <p className="auth-left-sub">
+            Factures, dépenses, TVA, bilan annuel — tout ce dont vous avez besoin
+            si vous gérez vous-même votre compta.
           </p>
-        )}
+          <ul className="auth-left-features">
+            {[
+              'Facturation numérotée automatiquement',
+              'Déclaration TVA précalculée (CA3)',
+              'Compte de résultat conforme ANC',
+              'Agent comptable IA inclus',
+              'Connexion Qonto & Shine',
+            ].map(f => (
+              <li key={f}><span className="alf-check">✓</span> {f}</li>
+            ))}
+          </ul>
+        </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="mt-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
-        >
-          {loading ? 'Connexion…' : 'Se connecter'}
-        </button>
-      </form>
+        <p className="auth-left-price">3 € / mois — sans engagement</p>
+      </div>
+
+      {/* ── Right — form ── */}
+      <div className="auth-right">
+        <div className="auth-form-wrap">
+
+          <div className="auth-form-header">
+            <h2 className="auth-form-title">Se connecter</h2>
+            <p className="auth-form-sub">Accédez à votre espace de travail.</p>
+          </div>
+
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <div className="auth-field">
+              <label htmlFor="email" className="auth-label">Email</label>
+              <input
+                id="email"
+                type="email"
+                required
+                autoFocus
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="auth-input"
+                placeholder="vous@entreprise.com"
+              />
+            </div>
+
+            <div className="auth-field">
+              <label htmlFor="password" className="auth-label">Mot de passe</label>
+              <input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="auth-input"
+                placeholder="••••••••"
+              />
+            </div>
+
+            <p className="auth-forgot">
+              <Link href="/mot-de-passe-oublie" className="auth-link">
+                Mot de passe oublié ?
+              </Link>
+            </p>
+
+            {error && <div className="auth-error" role="alert">{error}</div>}
+
+            <button type="submit" disabled={loading} className="auth-btn">
+              {loading ? 'Connexion…' : 'Se connecter →'}
+            </button>
+          </form>
+
+          <p className="auth-footer">
+            Pas encore de compte ?{' '}
+            <Link href="/register" className="auth-link">
+              Créer un espace de travail
+            </Link>
+          </p>
+
+        </div>
+      </div>
     </div>
   )
 }

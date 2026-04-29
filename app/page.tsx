@@ -10,7 +10,7 @@ export default function LandingPage() {
           <span className="ln-logo">📝 Compte-Pote</span>
           <nav className="ln-nav-links">
             <Link href="/login" className="ln-nav-login">Se connecter</Link>
-            <Link href="/login" className="ln-nav-cta">Commencer</Link>
+            <Link href="/register" className="ln-nav-cta">Commencer</Link>
           </nav>
         </div>
       </header>
@@ -27,7 +27,7 @@ export default function LandingPage() {
               Factures, dépenses, TVA, bilan annuel — tout ce qu'il vous faut si vous n'êtes pas
               obligé de passer par un expert-comptable.
             </p>
-            <Link href="/login" className="ln-cta">Essayer gratuitement →</Link>
+            <Link href="/register" className="ln-cta">Essayer gratuitement →</Link>
             <p className="ln-hero-price">3 € / mois — sans engagement</p>
           </div>
 
@@ -131,7 +131,7 @@ export default function LandingPage() {
                 <li key={item}><span className="ln-check">✓</span> {item}</li>
               ))}
             </ul>
-            <Link href="/login" className="ln-cta">Commencer maintenant →</Link>
+            <Link href="/register" className="ln-cta">Commencer maintenant →</Link>
             <p className="ln-pricing-note"><em>Moins qu'un café par mois.</em></p>
           </div>
         </div>

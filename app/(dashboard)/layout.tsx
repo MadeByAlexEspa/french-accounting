@@ -29,10 +29,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
     : membership.workspaces
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="sb-wrapper">
       <Sidebar workspace={workspace} userEmail={user.email ?? ''} />
-      <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-        {children}
+      <main className="sb-main">
+        <div className="sb-content">
+          {children}
+        </div>
       </main>
     </div>
   )
