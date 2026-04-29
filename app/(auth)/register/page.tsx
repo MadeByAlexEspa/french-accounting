@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { createWorkspace } from './actions'
+import { register } from './actions'
 
 function slugify(name: string) {
   return name
@@ -24,6 +23,7 @@ export default function RegisterPage() {
   const [confirm, setConfirm]         = useState('')
   const [error, setError]             = useState<string | null>(null)
   const [loading, setLoading]         = useState(false)
+  const [confirmed, setConfirmed]     = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -33,17 +33,22 @@ export default function RegisterPage() {
     setLoading(true)
     setError(null)
 
-    const supabase = createClient()
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({ email, password })
-
-    if (signUpError) { setError(signUpError.message); setLoading(false); return }
-    if (!authData.user) { setError('Erreur lors de la création du compte'); setLoading(false); return }
-
     const baseSlug = slugify(companyName) || 'workspace'
     const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 7)}`
 
-    const result = await createWorkspace(companyName, slug)
-    if (result.error) { setError(result.error); setLoading(false); return }
+    const result = await register({ email, password, companyName, slug })
+
+    if (result.error) {
+      setError(result.error)
+      setLoading(false)
+      return
+    }
+
+    if (result.needsConfirmation) {
+      setConfirmed(true)
+      setLoading(false)
+      return
+    }
 
     router.push('/transactions')
     router.refresh()
@@ -70,7 +75,7 @@ export default function RegisterPage() {
               'Accès à toutes les fonctionnalités',
               'Historique et données illimités',
               'Résiliable à tout moment',
-              '3 € / mois — moins qu\'un café',
+              "3 € / mois — moins qu'un café",
             ].map(f => (
               <li key={f}><span className="alf-check">✓</span> {f}</li>
             ))}
@@ -84,76 +89,93 @@ export default function RegisterPage() {
       <div className="auth-right">
         <div className="auth-form-wrap">
 
-          <div className="auth-form-header">
-            <h2 className="auth-form-title">Créer votre espace</h2>
-            <p className="auth-form-sub">Votre entreprise, vos données, isolées et sécurisées.</p>
-          </div>
+          {confirmed ? (
+            <>
+              <div className="auth-form-header">
+                <h2 className="auth-form-title">Vérifiez votre boîte mail</h2>
+                <p className="auth-form-sub">
+                  Un email de confirmation a été envoyé à <strong>{email}</strong>.
+                  Cliquez sur le lien pour activer votre compte et accéder à votre espace.
+                </p>
+              </div>
+              <p className="auth-footer">
+                <Link href="/login" className="auth-link">← Retour à la connexion</Link>
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="auth-form-header">
+                <h2 className="auth-form-title">Créer votre espace</h2>
+                <p className="auth-form-sub">Votre entreprise, vos données, isolées et sécurisées.</p>
+              </div>
 
-          <form className="auth-form" onSubmit={handleSubmit}>
-            <div className="auth-field">
-              <label htmlFor="company" className="auth-label">{"Nom de l'entreprise"}</label>
-              <input
-                id="company"
-                type="text"
-                required
-                autoFocus
-                value={companyName}
-                onChange={e => setCompanyName(e.target.value)}
-                className="auth-input"
-                placeholder="Acme SAS"
-              />
-            </div>
+              <form className="auth-form" onSubmit={handleSubmit}>
+                <div className="auth-field">
+                  <label htmlFor="company" className="auth-label">{"Nom de l'entreprise"}</label>
+                  <input
+                    id="company"
+                    type="text"
+                    required
+                    autoFocus
+                    value={companyName}
+                    onChange={e => setCompanyName(e.target.value)}
+                    className="auth-input"
+                    placeholder="Acme SAS"
+                  />
+                </div>
 
-            <div className="auth-field">
-              <label htmlFor="email" className="auth-label">Email professionnel</label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="auth-input"
-                placeholder="vous@entreprise.com"
-              />
-            </div>
+                <div className="auth-field">
+                  <label htmlFor="email" className="auth-label">Email professionnel</label>
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    className="auth-input"
+                    placeholder="vous@entreprise.com"
+                  />
+                </div>
 
-            <div className="auth-field">
-              <label htmlFor="password" className="auth-label">Mot de passe</label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="auth-input"
-                placeholder="6 caractères minimum"
-              />
-            </div>
+                <div className="auth-field">
+                  <label htmlFor="password" className="auth-label">Mot de passe</label>
+                  <input
+                    id="password"
+                    type="password"
+                    required
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="auth-input"
+                    placeholder="6 caractères minimum"
+                  />
+                </div>
 
-            <div className="auth-field">
-              <label htmlFor="confirm" className="auth-label">Confirmer le mot de passe</label>
-              <input
-                id="confirm"
-                type="password"
-                required
-                value={confirm}
-                onChange={e => setConfirm(e.target.value)}
-                className="auth-input"
-                placeholder="••••••••"
-              />
-            </div>
+                <div className="auth-field">
+                  <label htmlFor="confirm" className="auth-label">Confirmer le mot de passe</label>
+                  <input
+                    id="confirm"
+                    type="password"
+                    required
+                    value={confirm}
+                    onChange={e => setConfirm(e.target.value)}
+                    className="auth-input"
+                    placeholder="••••••••"
+                  />
+                </div>
 
-            {error && <div className="auth-error" role="alert">{error}</div>}
+                {error && <div className="auth-error" role="alert">{error}</div>}
 
-            <button type="submit" disabled={loading} className="auth-btn">
-              {loading ? 'Création en cours…' : 'Créer mon espace de travail →'}
-            </button>
-          </form>
+                <button type="submit" disabled={loading} className="auth-btn">
+                  {loading ? 'Création en cours…' : 'Créer mon espace de travail →'}
+                </button>
+              </form>
 
-          <p className="auth-footer">
-            Déjà un compte ?{' '}
-            <Link href="/login" className="auth-link">Se connecter</Link>
-          </p>
+              <p className="auth-footer">
+                Déjà un compte ?{' '}
+                <Link href="/login" className="auth-link">Se connecter</Link>
+              </p>
+            </>
+          )}
 
         </div>
       </div>
