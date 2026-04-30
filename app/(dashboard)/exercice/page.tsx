@@ -21,7 +21,26 @@ function presets() {
   ]
 }
 
-// ── P&L computation ───────────────────────────────────────────────────────────
+// ── Category helpers ──────────────────────────────────────────────────────────
+
+function catCode(cat: string) { return (cat ?? '').split(' ')[0] }
+
+// Cl. 1 (capitaux), Cl. 2 (immobilisations), 455 (CCA), 58 (virements internes)
+function isBilanCat(cat: string) {
+  const c = catCode(cat)
+  return /^[12]/.test(c) || c.startsWith('455') || c.startsWith('58')
+}
+function isImmobi(cat: string) { return /^2/.test(catCode(cat)) }
+function isImmobiIncorp(cat: string) { return /^(20|201|2051|2052)/.test(catCode(cat)) }
+// Cl. 21-29 that are not 2051/2052: corporelles + terrains/constructions
+function isImmobiCorp(cat: string) { return isImmobi(cat) && !isImmobiIncorp(cat) }
+
+function isCapital(cat: string)       { return catCode(cat).startsWith('101') }
+function isCompteExploit(cat: string) { return catCode(cat).startsWith('108') }
+function isEmprunt(cat: string)       { return catCode(cat).startsWith('164') }
+function isCCA(cat: string)           { return catCode(cat).startsWith('455') }
+
+// ── P&L computation (Cl. 6 / 7 only — excludes balance-sheet flows) ───────────
 
 interface PnL {
   produits: Record<string, number>
@@ -32,8 +51,8 @@ interface PnL {
 }
 
 function computePnL(factures: Facture[], depenses: Depense[], debut: string, fin: string): PnL {
-  const ff = factures.filter(f => f.date >= debut && f.date <= fin)
-  const fd = depenses.filter(d => d.date >= debut && d.date <= fin)
+  const ff = factures.filter(f => f.date >= debut && f.date <= fin && !isBilanCat(f.categorie))
+  const fd = depenses.filter(d => d.date >= debut && d.date <= fin && !isBilanCat(d.categorie) && !isImmobi(d.categorie))
   const produits: Record<string, number> = {}
   ff.forEach(f => { produits[f.categorie] = round2((produits[f.categorie] ?? 0) + f.montant_ht) })
   const charges: Record<string, number> = {}
@@ -43,75 +62,93 @@ function computePnL(factures: Facture[], depenses: Depense[], debut: string, fin
   return { produits, charges, total_produits, total_charges, resultat: round2(total_produits - total_charges) }
 }
 
-// ── Bilan auto-computed values ────────────────────────────────────────────────
+// ── Bilan computation from transactions ───────────────────────────────────────
 
-interface BilanAuto {
+interface BilanData {
+  // Actif immobilisé
+  imm_incorp: number
+  imm_corp: number
+  // Actif circulant
   creances_clients: number
   credit_tva: number
-  disponibilites: number   // positive = cash, 0 if negative
-  decouvert: number        // absolute value of negative trésorerie
+  disponibilites: number
+  decouvert: number
+  // Capitaux propres
+  capital: number
+  compte_exploit: number
+  report_a_nouveau: number
+  resultat: number
+  // Dettes financières
+  emprunts: number
+  cca: number
+  // Dettes d'exploitation
   dettes_fournisseurs: number
   tva_a_decaisser: number
+  // Debug
   tva_collectee: number
   tva_deductible: number
 }
 
-function computeBilanAuto(factures: Facture[], depenses: Depense[], debut: string, fin: string): BilanAuto {
-  const ff = factures.filter(f => f.date >= debut && f.date <= fin)
-  const fd = depenses.filter(d => d.date >= debut && d.date <= fin)
+function computeBilan(factures: Facture[], depenses: Depense[], debut: string, fin: string, resultat: number): BilanData {
+  // Cumulative: all transactions up to fin (balance sheet snapshot)
+  const allF = factures.filter(f => f.date <= fin)
+  const allD = depenses.filter(d => d.date <= fin)
+  // Period: current exercise (P&L and working capital)
+  const pF = factures.filter(f => f.date >= debut && f.date <= fin)
+  const pD = depenses.filter(d => d.date >= debut && d.date <= fin)
 
-  const creances_clients    = round2(ff.filter(f => f.statut === 'en_attente').reduce((s, f) => s + f.montant_ttc, 0))
-  const dettes_fournisseurs = round2(fd.filter(d => d.statut === 'en_attente').reduce((s, d) => s + d.montant_ttc, 0))
+  // ── Actif immobilisé — paid Cl.2 depenses, cumulative ──
+  const imm_incorp = round2(allD.filter(d => isImmobiIncorp(d.categorie) && d.statut === 'payee').reduce((s, d) => s + d.montant_ht, 0))
+  const imm_corp   = round2(allD.filter(d => isImmobiCorp(d.categorie)   && d.statut === 'payee').reduce((s, d) => s + d.montant_ht, 0))
 
-  const tva_collectee  = round2(ff.reduce((s, f) => s + f.montant_tva, 0))
-  const tva_deductible = round2(fd.reduce((s, d) => s + d.montant_tva, 0))
+  // ── Disponibilités — all paid cash flows, cumulative ──
+  const cashIn  = allF.filter(f => f.statut === 'payee').reduce((s, f) => s + f.montant_ttc, 0)
+  const cashOut = allD.filter(d => d.statut === 'payee').reduce((s, d) => s + d.montant_ttc, 0)
+  const treso = round2(cashIn - cashOut)
+
+  // ── Créances clients — unpaid operating factures, period ──
+  const creances_clients = round2(pF.filter(f => f.statut === 'en_attente' && !isBilanCat(f.categorie)).reduce((s, f) => s + f.montant_ttc, 0))
+
+  // ── TVA — period ──
+  const tva_collectee  = round2(pF.reduce((s, f) => s + f.montant_tva, 0))
+  const tva_deductible = round2(pD.reduce((s, d) => s + d.montant_tva, 0))
   const tva_net = round2(tva_collectee - tva_deductible)
 
-  const treso = round2(
-    ff.filter(f => f.statut === 'payee').reduce((s, f) => s + f.montant_ttc, 0) -
-    fd.filter(d => d.statut === 'payee').reduce((s, d) => s + d.montant_ttc, 0)
+  // ── Capitaux propres — cumulative ──
+  const capital = round2(allF.filter(f => isCapital(f.categorie)).reduce((s, f) => s + f.montant_ht, 0))
+  const apports  = allF.filter(f => isCompteExploit(f.categorie)).reduce((s, f) => s + f.montant_ht, 0)
+  const prelev   = allD.filter(d => isCompteExploit(d.categorie)).reduce((s, d) => s + d.montant_ht, 0)
+  const compte_exploit = round2(apports - prelev)
+
+  // Report à nouveau: cumulated P&L result BEFORE current period
+  const prevF = factures.filter(f => f.date < debut && !isBilanCat(f.categorie))
+  const prevD = depenses.filter(d => d.date < debut && !isBilanCat(d.categorie) && !isImmobi(d.categorie))
+  const report_a_nouveau = round2(
+    prevF.reduce((s, f) => s + f.montant_ht, 0) -
+    prevD.reduce((s, d) => s + d.montant_ht, 0)
   )
 
+  // ── Dettes financières — net cumulative ──
+  const emprunts_rec = allF.filter(f => isEmprunt(f.categorie)).reduce((s, f) => s + f.montant_ht, 0)
+  const emprunts_rem = allD.filter(d => isEmprunt(d.categorie)).reduce((s, d) => s + d.montant_ht, 0)
+  const emprunts = round2(emprunts_rec - emprunts_rem)
+
+  const cca_rec = allF.filter(f => isCCA(f.categorie)).reduce((s, f) => s + f.montant_ht, 0)
+  const cca_rem = allD.filter(d => isCCA(d.categorie)).reduce((s, d) => s + d.montant_ht, 0)
+  const cca = round2(cca_rec - cca_rem)
+
+  // ── Dettes fournisseurs — unpaid operating depenses, period ──
+  const dettes_fournisseurs = round2(pD.filter(d => d.statut === 'en_attente' && !isBilanCat(d.categorie) && !isImmobi(d.categorie)).reduce((s, d) => s + d.montant_ttc, 0))
+
   return {
-    creances_clients,
-    credit_tva:   tva_net < 0 ? -tva_net : 0,
-    disponibilites: treso > 0 ? treso : 0,
-    decouvert:      treso < 0 ? -treso : 0,
-    dettes_fournisseurs,
-    tva_a_decaisser: tva_net > 0 ? tva_net : 0,
+    imm_incorp, imm_corp,
+    creances_clients, credit_tva: tva_net < 0 ? -tva_net : 0,
+    disponibilites: treso > 0 ? treso : 0, decouvert: treso < 0 ? -treso : 0,
+    capital, compte_exploit, report_a_nouveau, resultat,
+    emprunts, cca,
+    dettes_fournisseurs, tva_a_decaisser: tva_net > 0 ? tva_net : 0,
     tva_collectee, tva_deductible,
   }
-}
-
-// ── Manual saisies (stored in localStorage per year) ──────────────────────────
-
-interface Saisies {
-  imm_incorp: number    // Immobilisations incorporelles — 2050 · AU
-  imm_corp: number      // Immobilisations corporelles   — 2050 · BP
-  capital: number       // Capital social                — 2051 · DA
-  compte_exploit: number// Compte exploitant (108)       — 2051 · DH
-  report_nv: number     // Report à nouveau              — 2051 · DG
-  emprunts: number      // Emprunts bancaires (164)      — 2051 · FB
-  cca: number           // Comptes courants associés(455)— 2051 · FC
-}
-
-const SAISIES_DEFAULTS: Saisies = {
-  imm_incorp: 0, imm_corp: 0, capital: 0,
-  compte_exploit: 0, report_nv: 0, emprunts: 0, cca: 0,
-}
-
-function lsKey(debut: string) { return `bilan_saisies_${debut.slice(0, 4)}` }
-
-function loadSaisies(debut: string): Saisies {
-  try {
-    const raw = localStorage.getItem(lsKey(debut))
-    if (raw) return { ...SAISIES_DEFAULTS, ...JSON.parse(raw) }
-  } catch { /* ignore */ }
-  return { ...SAISIES_DEFAULTS }
-}
-
-function saveSaisies(debut: string, s: Saisies) {
-  try { localStorage.setItem(lsKey(debut), JSON.stringify(s)) } catch { /* ignore */ }
 }
 
 // ── Bilan sub-components ──────────────────────────────────────────────────────
@@ -128,8 +165,9 @@ function Ref({ v }: { v: string }) {
 function GroupHeader({ label, liasse }: { label: string; liasse?: string }) {
   return (
     <tr style={{ background: 'var(--offwhite)' }}>
-      <td style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase',
-        color: 'var(--pencil)', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
+        textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>{label}</span>
         {liasse && <Ref v={liasse} />}
       </td>
@@ -137,43 +175,19 @@ function GroupHeader({ label, liasse }: { label: string; liasse?: string }) {
   )
 }
 
-function AutoRow({ label, compte, liasse, montant, positive }: {
-  label: string; compte?: string; liasse?: string; montant: number; positive?: boolean
+function BilanRow({ label, compte, liasse, montant, positive, hide0 }: {
+  label: string; compte?: string; liasse?: string; montant: number; positive?: boolean; hide0?: boolean
 }) {
-  if (montant === 0) return null
-  const color = positive !== undefined ? (positive ? '#15803d' : '#dc2626') : undefined
+  if (hide0 && montant === 0) return null
+  const color = positive !== undefined ? (montant >= 0 ? (positive ? '#15803d' : '#dc2626') : '#dc2626') : undefined
   return (
     <tr>
       <td style={{ paddingLeft: 24 }}>
         {compte && <span style={{ fontSize: 10, fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)', marginRight: 6 }}>{compte}</span>}
         {label}
         {liasse && <Ref v={liasse} />}
-        <span style={{ marginLeft: 8, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>auto</span>
       </td>
       <td className="right" style={{ fontFamily: 'Courier Prime,monospace', color }}>{formatEur(montant)}</td>
-    </tr>
-  )
-}
-
-function ManualRow({ label, compte, liasse, value, onChange }: {
-  label: string; compte?: string; liasse?: string; value: number; onChange: (v: number) => void
-}) {
-  return (
-    <tr>
-      <td style={{ paddingLeft: 24 }}>
-        {compte && <span style={{ fontSize: 10, fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)', marginRight: 6 }}>{compte}</span>}
-        {label}
-        {liasse && <Ref v={liasse} />}
-      </td>
-      <td className="right" style={{ width: 140 }}>
-        <input
-          type="number" step="0.01" value={value || ''}
-          onChange={e => onChange(parseFloat(e.target.value) || 0)}
-          placeholder="0,00"
-          style={{ fontSize: 12, padding: '2px 6px', border: '1px solid var(--rule)', borderRadius: 2,
-            fontFamily: 'Courier Prime,monospace', width: 120, textAlign: 'right', background: '#fafafa' }}
-        />
-      </td>
     </tr>
   )
 }
@@ -198,35 +212,17 @@ function SubtotalRow({ label, liasse, montant, bold }: { label: string; liasse?:
 
 // ── Bilan Tab ─────────────────────────────────────────────────────────────────
 
-function BilanTab({ debut, fin, pnl, bilanAuto }: {
-  debut: string; fin: string; pnl: PnL; bilanAuto: BilanAuto
-}) {
-  const [saisies, setSaisies] = useState<Saisies>(SAISIES_DEFAULTS)
+function BilanTab({ debut, fin, bilan }: { debut: string; fin: string; bilan: BilanData }) {
+  const totalImmobi     = round2(bilan.imm_incorp + bilan.imm_corp)
+  const totalCirculant  = round2(bilan.creances_clients + bilan.credit_tva + bilan.disponibilites)
+  const totalActif      = round2(totalImmobi + totalCirculant)
 
-  useEffect(() => {
-    setSaisies(loadSaisies(debut))
-  }, [debut])
+  const totalCapPropres = round2(bilan.capital + bilan.compte_exploit + bilan.report_a_nouveau + bilan.resultat)
+  const totalDettesFin  = round2(bilan.emprunts + bilan.cca)
+  const totalDettesExpl = round2(bilan.dettes_fournisseurs + bilan.tva_a_decaisser + bilan.decouvert)
+  const totalPassif     = round2(totalCapPropres + totalDettesFin + totalDettesExpl)
 
-  function update(key: keyof Saisies, val: number) {
-    const next = { ...saisies, [key]: val }
-    setSaisies(next)
-    saveSaisies(debut, next)
-  }
-
-  // ── Actif totals
-  const totalImmobi = round2(saisies.imm_incorp + saisies.imm_corp)
-  const totalCirculant = round2(
-    bilanAuto.creances_clients + bilanAuto.credit_tva + bilanAuto.disponibilites
-  )
-  const totalActif = round2(totalImmobi + totalCirculant)
-
-  // ── Passif totals
-  const totalCapPropres = round2(saisies.capital + saisies.compte_exploit + saisies.report_nv + pnl.resultat)
-  const totalDettesFin = round2(saisies.emprunts + saisies.cca)
-  const totalDettesExpl = round2(bilanAuto.dettes_fournisseurs + bilanAuto.tva_a_decaisser + bilanAuto.decouvert)
-  const totalPassif = round2(totalCapPropres + totalDettesFin + totalDettesExpl)
-
-  const ecart = round2(totalActif - totalPassif)
+  const ecart    = round2(totalActif - totalPassif)
   const equilibre = Math.abs(ecart) < 0.02
 
   return (
@@ -240,18 +236,18 @@ function BilanTab({ debut, fin, pnl, bilanAuto }: {
             <tbody>
               {/* Actif immobilisé */}
               <GroupHeader label="Actif immobilisé" liasse="Formulaire 2050" />
-              <ManualRow label="Immobilisations incorporelles (net)" compte="(20x)" liasse="2050 · AU" value={saisies.imm_incorp} onChange={v => update('imm_incorp', v)} />
-              <ManualRow label="Immobilisations corporelles (net)"  compte="(21x)" liasse="2050 · BP" value={saisies.imm_corp}   onChange={v => update('imm_corp', v)} />
-              {totalImmobi > 0 && <SubtotalRow label="Total actif immobilisé" liasse="2050 · BV" montant={totalImmobi} />}
+              <BilanRow label="Immobilisations incorporelles (net)" compte="(20x)" liasse="2050 · AU" montant={bilan.imm_incorp} hide0 />
+              <BilanRow label="Immobilisations corporelles (net)"   compte="(21x)" liasse="2050 · BP" montant={bilan.imm_corp}   hide0 />
+              {totalImmobi === 0
+                ? <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 24 }}>Aucune immobilisation (catégories 20x, 21x).</td></tr>
+                : <SubtotalRow label="Total actif immobilisé" liasse="2050 · BV" montant={totalImmobi} />}
 
               {/* Actif circulant */}
               <GroupHeader label="Actif circulant" liasse="Formulaire 2050" />
-              <AutoRow label="Créances clients" compte="(41)" liasse="2050 · CT" montant={bilanAuto.creances_clients} />
-              <AutoRow label="Crédit de TVA"    compte="(44567)" liasse="2050 · CW" montant={bilanAuto.credit_tva} />
-              <AutoRow label="Disponibilités – Banque" compte="(512)" liasse="2050 · DB" montant={bilanAuto.disponibilites} />
-              {totalCirculant === 0 && (
-                <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 24 }}>Aucune donnée calculable.</td></tr>
-              )}
+              <BilanRow label="Créances clients"        compte="(41)"    liasse="2050 · CT" montant={bilan.creances_clients} hide0 />
+              <BilanRow label="Crédit de TVA"           compte="(44567)" liasse="2050 · CW" montant={bilan.credit_tva}       hide0 />
+              <BilanRow label="Disponibilités – Banque" compte="(512)"   liasse="2050 · DB" montant={bilan.disponibilites}   hide0 />
+              {totalCirculant === 0 && <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 24 }}>Aucun actif circulant.</td></tr>}
               <SubtotalRow label="Total actif circulant" liasse="2050 · DH" montant={totalCirculant} />
             </tbody>
             <tfoot>
@@ -267,32 +263,35 @@ function BilanTab({ debut, fin, pnl, bilanAuto }: {
             <tbody>
               {/* Capitaux propres */}
               <GroupHeader label="Capitaux propres" liasse="Formulaire 2051" />
-              <ManualRow label="Capital social"        compte="(101)" liasse="2051 · DA" value={saisies.capital}       onChange={v => update('capital', v)} />
-              <ManualRow label="Compte exploitant"     compte="(108)" liasse="2051 · DH" value={saisies.compte_exploit} onChange={v => update('compte_exploit', v)} />
-              <ManualRow label="Report à nouveau"      compte="(11)"  liasse="2051 · DG" value={saisies.report_nv}     onChange={v => update('report_nv', v)} />
-              <AutoRow
-                label={pnl.resultat >= 0 ? 'Résultat de l\'exercice (bénéfice)' : 'Résultat de l\'exercice (déficit)'}
-                compte={pnl.resultat >= 0 ? '(120)' : '(129)'}
+              <BilanRow label="Capital social"        compte="(101)" liasse="2051 · DA" montant={bilan.capital}         hide0 />
+              <BilanRow label="Compte exploitant"     compte="(108)" liasse="2051 · DH" montant={bilan.compte_exploit}  hide0 />
+              <BilanRow label="Report à nouveau"      compte="(11)"  liasse="2051 · DG" montant={bilan.report_a_nouveau} hide0 />
+              <BilanRow
+                label={bilan.resultat >= 0 ? 'Résultat de l\'exercice (bénéfice)' : 'Résultat de l\'exercice (déficit)'}
+                compte={bilan.resultat >= 0 ? '(120)' : '(129)'}
                 liasse="2051 · DI/DJ"
-                montant={pnl.resultat}
-                positive={pnl.resultat >= 0}
+                montant={bilan.resultat}
+                positive={bilan.resultat >= 0}
               />
+              {totalCapPropres === 0 && <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 24 }}>Aucune entrée (101, 108…).</td></tr>}
               <SubtotalRow label="Total capitaux propres" liasse="2051 · DM" montant={totalCapPropres} />
 
               {/* Dettes financières */}
-              <GroupHeader label="Dettes financières" liasse="Formulaire 2051" />
-              <ManualRow label="Emprunts bancaires"          compte="(164)" liasse="2051 · FB" value={saisies.emprunts} onChange={v => update('emprunts', v)} />
-              <ManualRow label="Comptes courants associés"   compte="(455)" liasse="2051 · FC" value={saisies.cca}      onChange={v => update('cca', v)} />
-              {totalDettesFin > 0 && <SubtotalRow label="Total dettes financières" liasse="2051 · FJ" montant={totalDettesFin} />}
+              {totalDettesFin > 0 && (
+                <>
+                  <GroupHeader label="Dettes financières" liasse="Formulaire 2051" />
+                  <BilanRow label="Emprunts bancaires"          compte="(164)" liasse="2051 · FB" montant={bilan.emprunts} hide0 />
+                  <BilanRow label="Comptes courants associés"   compte="(455)" liasse="2051 · FC" montant={bilan.cca}      hide0 />
+                  <SubtotalRow label="Total dettes financières" liasse="2051 · FJ" montant={totalDettesFin} />
+                </>
+              )}
 
               {/* Dettes d'exploitation */}
               <GroupHeader label="Dettes d'exploitation" liasse="Formulaire 2051" />
-              <AutoRow label="Dettes fournisseurs" compte="(40)"    liasse="2051 · FE" montant={bilanAuto.dettes_fournisseurs} />
-              <AutoRow label="TVA à décaisser"     compte="(44551)" liasse="2051 · FF" montant={bilanAuto.tva_a_decaisser} />
-              <AutoRow label="Découvert bancaire"  compte="(564)"   liasse="2051 · FB" montant={bilanAuto.decouvert} />
-              {totalDettesExpl === 0 && (
-                <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 24 }}>Aucune dette d'exploitation.</td></tr>
-              )}
+              <BilanRow label="Dettes fournisseurs" compte="(40)"    liasse="2051 · FE" montant={bilan.dettes_fournisseurs} hide0 />
+              <BilanRow label="TVA à décaisser"     compte="(44551)" liasse="2051 · FF" montant={bilan.tva_a_decaisser}    hide0 />
+              <BilanRow label="Découvert bancaire"  compte="(564)"   liasse="2051 · FB" montant={bilan.decouvert}          hide0 />
+              {totalDettesExpl === 0 && <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 24 }}>Aucune dette d'exploitation.</td></tr>}
               <SubtotalRow label="Total dettes d'exploitation" liasse="2051 · FJ" montant={totalDettesExpl} />
             </tbody>
             <tfoot>
@@ -311,7 +310,7 @@ function BilanTab({ debut, fin, pnl, bilanAuto }: {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: equilibre ? '#15803d' : '#dc2626' }}>
-            {equilibre ? '✓ Bilan équilibré — Actif = Passif' : `⚠️ Écart de ${formatEur(Math.abs(ecart))} — vérifiez les saisies`}
+            {equilibre ? '✓ Bilan équilibré — Actif = Passif' : `⚠️ Écart de ${formatEur(Math.abs(ecart))}`}
           </div>
           <div style={{ display: 'flex', gap: 24, fontSize: 13 }}>
             <span>Total Actif : <strong>{formatEur(totalActif)}</strong></span>
@@ -320,16 +319,17 @@ function BilanTab({ debut, fin, pnl, bilanAuto }: {
         </div>
         {!equilibre && (
           <div style={{ marginTop: 8, fontSize: 12, color: '#7f1d1d' }}>
-            {ecart > 0 ? `L'actif est supérieur au passif de ${formatEur(ecart)}. Vérifiez le capital, les emprunts ou les immobilisations.`
-                       : `Le passif est supérieur à l'actif de ${formatEur(-ecart)}. Vérifiez les saisies manuelles ou les transactions manquantes.`}
+            {ecart > 0
+              ? `L'actif dépasse le passif de ${formatEur(ecart)}. Vérifiez vos saisies de capital (101), emprunts (164) ou immobilisations (2x).`
+              : `Le passif dépasse l'actif de ${formatEur(-ecart)}. Des transactions pourraient manquer ou être mal catégorisées.`}
           </div>
         )}
       </div>
 
       <p style={{ marginTop: 12, fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)', lineHeight: 1.7 }}>
-        Les lignes <em>auto</em> sont calculées depuis vos transactions sur la période {debut} → {fin}.
-        Capital, emprunts, C/C associés et immobilisations sont à saisir manuellement — les valeurs sont conservées par année.
-        TVA collectée : {formatEur(bilanAuto.tva_collectee)} · TVA déductible : {formatEur(bilanAuto.tva_deductible)}.
+        Calculé depuis vos transactions · Période {debut} → {fin} pour le résultat et le fonds de roulement · Cumulatif depuis l'origine pour le bilan patrimonial.
+        TVA collectée {formatEur(bilan.tva_collectee)} · TVA déductible {formatEur(bilan.tva_deductible)}.
+        Pour équilibrer le bilan, catégorisez apports en capital (101), emprunts (164), immobilisations (2051, 2052, 213…).
       </p>
     </>
   )
@@ -350,7 +350,6 @@ export default function ExercicePage() {
   const [tab, setTab]           = useState<Tab>('resultat')
   const [activePreset, setActivePreset] = useState<number | null>(0)
 
-  // Restore from localStorage
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(LS_EXERCICE) ?? 'null')
@@ -373,19 +372,9 @@ export default function ExercicePage() {
     setDebut(p.debut); setFin(p.fin); setActivePreset(i)
     persist({ debut: p.debut, fin: p.fin, tab, activePreset: i })
   }
-
-  function handleDebut(v: string) {
-    setDebut(v); setActivePreset(null)
-    persist({ debut: v, fin, tab, activePreset: null })
-  }
-  function handleFin(v: string) {
-    setFin(v); setActivePreset(null)
-    persist({ debut, fin: v, tab, activePreset: null })
-  }
-  function handleTab(t: Tab) {
-    setTab(t)
-    persist({ debut, fin, tab: t, activePreset })
-  }
+  function handleDebut(v: string) { setDebut(v); setActivePreset(null); persist({ debut: v, fin, tab, activePreset: null }) }
+  function handleFin(v: string)   { setFin(v);   setActivePreset(null); persist({ debut, fin: v, tab, activePreset: null }) }
+  function handleTab(t: Tab)      { setTab(t); persist({ debut, fin, tab: t, activePreset }) }
 
   useEffect(() => {
     const supabase = createClient()
@@ -407,8 +396,8 @@ export default function ExercicePage() {
     load()
   }, [])
 
-  const pnl      = useMemo(() => computePnL(factures, depenses, debut, fin),      [factures, depenses, debut, fin])
-  const bilanAuto = useMemo(() => computeBilanAuto(factures, depenses, debut, fin), [factures, depenses, debut, fin])
+  const pnl   = useMemo(() => computePnL(factures, depenses, debut, fin),            [factures, depenses, debut, fin])
+  const bilan = useMemo(() => computeBilan(factures, depenses, debut, fin, pnl.resultat), [factures, depenses, debut, fin, pnl.resultat])
 
   return (
     <div className="dash-page">
@@ -424,11 +413,10 @@ export default function ExercicePage() {
         </div>
       </div>
 
-      {/* Presets */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
         {ps.map((p, i) => (
           <button key={p.label}
-            className={`dash-btn-ghost ${activePreset === i ? 'dash-btn-ghost-active' : ''}`}
+            className="dash-btn-ghost"
             style={{ fontSize: 12, padding: '6px 12px', fontWeight: activePreset === i ? 700 : undefined, borderColor: activePreset === i ? 'var(--ink)' : undefined }}
             onClick={() => applyPreset(i)}>{p.label}</button>
         ))}
@@ -439,7 +427,6 @@ export default function ExercicePage() {
 
       {!loading && (
         <>
-          {/* KPIs */}
           <div className="dash-kpi-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
             <div className="dash-kpi-card">
               <p className="dash-kpi-label">Produits HT</p>
@@ -465,23 +452,20 @@ export default function ExercicePage() {
             }
           </div>
 
-          {/* Tabs */}
           <div className="dash-tabs">
-            <button className={`dash-tab ${tab === 'resultat' ? 'dash-tab-active' : ''}`} onClick={() => handleTab('resultat')}>
-              Compte de résultat
-            </button>
-            <button className={`dash-tab ${tab === 'bilan' ? 'dash-tab-active' : ''}`} onClick={() => handleTab('bilan')}>
-              Bilan simplifié
-            </button>
+            <button className={`dash-tab ${tab === 'resultat' ? 'dash-tab-active' : ''}`} onClick={() => handleTab('resultat')}>Compte de résultat</button>
+            <button className={`dash-tab ${tab === 'bilan' ? 'dash-tab-active' : ''}`} onClick={() => handleTab('bilan')}>Bilan simplifié</button>
           </div>
 
-          {/* ── Compte de résultat ────────────────────────────────────────── */}
+          {/* ── Compte de résultat ──────────────────────────────────────── */}
           {tab === 'resultat' && (
             <div className="dash-section">
               <div className="dash-table-wrap"><table className="dash-table">
                 <tbody>
                   <tr style={{ background: 'var(--offwhite)' }}>
-                    <td style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px', display: 'flex', justifyContent: 'space-between' }}>
+                    <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
+                      textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
+                      display: 'flex', justifyContent: 'space-between' }}>
                       <span>Produits — Chiffre d&apos;affaires HT</span>
                       <Ref v="Formulaire 2052" />
                     </td>
@@ -492,14 +476,16 @@ export default function ExercicePage() {
                       <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(montant)}</td>
                     </tr>
                   ))}
-                  {Object.keys(pnl.produits).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucun produit.</td></tr>}
+                  {Object.keys(pnl.produits).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucun produit sur cette période.</td></tr>}
                   <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
                     <td>Total produits <Ref v="2052 · FJ" /></td>
                     <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_produits)}</td>
                   </tr>
 
                   <tr style={{ background: 'var(--offwhite)' }}>
-                    <td style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px', display: 'flex', justifyContent: 'space-between' }}>
+                    <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
+                      textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
+                      display: 'flex', justifyContent: 'space-between' }}>
                       <span>Charges — Dépenses HT</span>
                       <Ref v="Formulaire 2052" />
                     </td>
@@ -510,7 +496,7 @@ export default function ExercicePage() {
                       <td className="right" style={{ color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace' }}>{formatEur(montant)}</td>
                     </tr>
                   ))}
-                  {Object.keys(pnl.charges).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucune charge.</td></tr>}
+                  {Object.keys(pnl.charges).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucune charge sur cette période.</td></tr>}
                   <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
                     <td>Total charges <Ref v="2052 · GM" /></td>
                     <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_charges)}</td>
@@ -528,15 +514,13 @@ export default function ExercicePage() {
                 </tbody>
               </table></div>
               <p style={{ marginTop: 12, fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)' }}>
-                Les mouvements de capitaux (Cl. 1) et immobilisations (Cl. 2) n'apparaissent pas dans le compte de résultat — ils figurent au Bilan.
+                Les mouvements de capitaux (Cl. 1), immobilisations (Cl. 2) et virements internes (58) sont exclus du compte de résultat — ils figurent au Bilan.
               </p>
             </div>
           )}
 
-          {/* ── Bilan ─────────────────────────────────────────────────────── */}
-          {tab === 'bilan' && (
-            <BilanTab debut={debut} fin={fin} pnl={pnl} bilanAuto={bilanAuto} />
-          )}
+          {/* ── Bilan ───────────────────────────────────────────────────── */}
+          {tab === 'bilan' && <BilanTab debut={debut} fin={fin} bilan={bilan} />}
         </>
       )}
     </div>
