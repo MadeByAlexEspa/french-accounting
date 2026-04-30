@@ -605,6 +605,14 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
+const LS_TXN = 'transactions_filters'
+
+type SavedFilters = { tab: Tab; filterTiers: string; filterDateFrom: string; filterDateTo: string; filterCategorie: string; filterStatut: string }
+
+function loadFilters(): Partial<SavedFilters> {
+  try { return JSON.parse(localStorage.getItem(LS_TXN) ?? '{}') } catch { return {} }
+}
+
 export default function TransactionsPage() {
   const [tab, setTab] = useState<Tab>('tous')
   const [factures, setFactures] = useState<Facture[]>([])
@@ -620,6 +628,17 @@ export default function TransactionsPage() {
   const [filterDateTo, setFilterDateTo] = useState('')
   const [filterCategorie, setFilterCategorie] = useState('')
   const [filterStatut, setFilterStatut] = useState('')
+
+  // Restore filters from localStorage after hydration
+  useEffect(() => {
+    const s = loadFilters()
+    if (s.tab) setTab(s.tab)
+    if (s.filterTiers) setFilterTiers(s.filterTiers)
+    if (s.filterDateFrom) setFilterDateFrom(s.filterDateFrom)
+    if (s.filterDateTo) setFilterDateTo(s.filterDateTo)
+    if (s.filterCategorie) setFilterCategorie(s.filterCategorie)
+    if (s.filterStatut) setFilterStatut(s.filterStatut)
+  }, [])
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -661,6 +680,9 @@ export default function TransactionsPage() {
 
   useEffect(() => { load() }, [load])
   useEffect(() => { setPage(1) }, [filterTiers, filterDateFrom, filterDateTo, filterCategorie, filterStatut, tab])
+  useEffect(() => {
+    try { localStorage.setItem(LS_TXN, JSON.stringify({ tab, filterTiers, filterDateFrom, filterDateTo, filterCategorie, filterStatut })) } catch { /* ignore */ }
+  }, [tab, filterTiers, filterDateFrom, filterDateTo, filterCategorie, filterStatut])
 
   // ── Rows ───────────────────────────────────────────────────────────────────
 
