@@ -1,21 +1,14 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import type { Facture, Depense } from '@/lib/types/database'
+import { getCatEntreesGroups, getCatSortiesGroups, type CatGroup } from '@/lib/categories'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 20
-
-const CAT_ENTREES = ['Ventes de marchandises', 'Prestations de services', 'Produits financiers', 'Autres produits']
-const CAT_SORTIES = [
-  'Achats de marchandises', 'Achats de matières premières', 'Frais de personnel',
-  'Loyers et charges locatives', 'Frais de déplacement', 'Publicité et marketing',
-  'Frais bancaires', 'Assurances', 'Honoraires', 'Matériel et équipement',
-  'Logiciels et abonnements', 'Fournitures de bureau', 'Charges sociales',
-  'Impôts et taxes', 'Autres charges',
-]
 const TVA_RATES = ['0', '5.5', '10', '20']
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -138,20 +131,22 @@ function TvaSplitPanel({ row, onSave, onClose }: {
   )
 }
 
-// ── Entry Form Modal ───────────────────────────────────────────────────────────
+// ── Entry Form Modals ─────────────────────────────────────────────────────────
 
 interface FForm { date: string; client: string; description: string; montant_ht: string; taux_tva: string; categorie: string; statut: 'payee' | 'en_attente' }
 interface DForm { date: string; fournisseur: string; description: string; montant_ht: string; taux_tva: string; categorie: string; statut: 'payee' | 'en_attente' }
 
-function FactureModal({ initial, factures, workspaceId, onSaved, onClose }: {
-  initial?: Facture | null; factures: Facture[]; workspaceId: string; onSaved: () => void; onClose: () => void
+function FactureModal({ initial, factures, workspaceId, activiteType, onSaved, onClose }: {
+  initial?: Facture | null; factures: Facture[]; workspaceId: string; activiteType: string | null; onSaved: () => void; onClose: () => void
 }) {
+  const cats = getCatEntreesGroups(activiteType)
+  const firstCat = cats[0]?.options[0]?.value ?? ''
   const [form, setForm] = useState<FForm>({
     date: initial?.date ?? today(), client: initial?.client ?? '',
     description: initial?.description ?? '',
     montant_ht: initial ? String(initial.montant_ht) : '',
     taux_tva: initial ? String(Math.max(0, initial.taux_tva)) : '20',
-    categorie: initial?.categorie ?? CAT_ENTREES[0], statut: initial?.statut ?? 'en_attente',
+    categorie: initial?.categorie ?? firstCat, statut: initial?.statut ?? 'en_attente',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -199,7 +194,12 @@ function FactureModal({ initial, factures, workspaceId, onSaved, onClose }: {
             </div>
             <div className="dash-field"><label className="dash-field-label">Catégorie</label>
               <select className="dash-field-select" value={form.categorie} onChange={e => setForm(f => ({ ...f, categorie: e.target.value }))}>
-                {CAT_ENTREES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                {cats.map(g => (
+                  <optgroup key={g.group} label={g.group}>
+                    {g.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </optgroup>
+                ))}
+              </select></div>
             {error && <div className="dash-error">{error}</div>}
           </div>
           <div className="dash-modal-footer">
@@ -212,15 +212,17 @@ function FactureModal({ initial, factures, workspaceId, onSaved, onClose }: {
   )
 }
 
-function DepenseModal({ initial, workspaceId, onSaved, onClose }: {
-  initial?: Depense | null; workspaceId: string; onSaved: () => void; onClose: () => void
+function DepenseModal({ initial, workspaceId, activiteType, onSaved, onClose }: {
+  initial?: Depense | null; workspaceId: string; activiteType: string | null; onSaved: () => void; onClose: () => void
 }) {
+  const cats = getCatSortiesGroups(activiteType)
+  const firstCat = cats[0]?.options[0]?.value ?? ''
   const [form, setForm] = useState<DForm>({
     date: initial?.date ?? today(), fournisseur: initial?.fournisseur ?? '',
     description: initial?.description ?? '',
     montant_ht: initial ? String(initial.montant_ht) : '',
     taux_tva: initial ? String(Math.max(0, initial.taux_tva)) : '20',
-    categorie: initial?.categorie ?? CAT_SORTIES[0], statut: initial?.statut ?? 'en_attente',
+    categorie: initial?.categorie ?? firstCat, statut: initial?.statut ?? 'en_attente',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -268,7 +270,12 @@ function DepenseModal({ initial, workspaceId, onSaved, onClose }: {
             </div>
             <div className="dash-field"><label className="dash-field-label">Catégorie</label>
               <select className="dash-field-select" value={form.categorie} onChange={e => setForm(f => ({ ...f, categorie: e.target.value }))}>
-                {CAT_SORTIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                {cats.map(g => (
+                  <optgroup key={g.group} label={g.group}>
+                    {g.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </optgroup>
+                ))}
+              </select></div>
             {error && <div className="dash-error">{error}</div>}
           </div>
           <div className="dash-modal-footer">
@@ -281,88 +288,287 @@ function DepenseModal({ initial, workspaceId, onSaved, onClose }: {
   )
 }
 
-// ── Inline Cell ────────────────────────────────────────────────────────────────
+// ── InlineCombobox (portaled dropdown, no layout shift) ───────────────────────
 
-function InlineCell({ rowKey, field, display, editType, value, options, catOptions, onStartEdit, onSave, isEditing, editingValue, setEditingValue, onSplitClick }: {
-  rowKey: string; field: string; display: React.ReactNode; editType?: string
-  value: string; options?: { value: string; label: string }[]; catOptions?: string[]
-  onStartEdit: (rowKey: string, field: string, value: string) => void
-  onSave: (value: string) => void; isEditing: boolean
-  editingValue: string; setEditingValue: (v: string) => void
+function InlineCombobox({ groups, initialValue, onCommit, onCancel }: {
+  groups: CatGroup[]
+  initialValue: string
+  onCommit: (v: string) => void
+  onCancel: () => void
+}) {
+  const [query, setQuery] = useState('')
+  const [highlighted, setHighlighted] = useState(0)
+  const [dropPos, setDropPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null)
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  const flatAll = groups.flatMap(g => g.options)
+  const q = query.trim().toLowerCase()
+  const filtered = q ? flatAll.filter(o => o.label.toLowerCase().includes(q)) : null
+
+  let _idx = 0
+  const displayGroups = filtered
+    ? [{ group: null as string | null, options: filtered.map(o => ({ ...o, _idx: _idx++ })) }]
+    : groups.map(g => ({ group: g.group, options: g.options.map(o => ({ ...o, _idx: _idx++ })) }))
+  const totalOptions = _idx
+
+  useEffect(() => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const dropW = Math.max(rect.width, 320)
+    const dropH = Math.min(300, flatAll.length * 32 + 48)
+    const spaceBelow = window.innerHeight - rect.bottom
+    const above = spaceBelow < dropH && rect.top > dropH
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - dropW - 8))
+    setDropPos(above
+      ? { bottom: window.innerHeight - rect.top + 2, left, width: dropW }
+      : { top: rect.bottom + 2, left, width: dropW })
+    const curIdx = flatAll.findIndex(o => o.value === initialValue)
+    setHighlighted(curIdx >= 0 ? curIdx : 0)
+    inputRef.current?.focus({ preventScroll: true })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const fn = (e: Event) => { if (listRef.current?.contains(e.target as Node)) return; onCancel() }
+    document.addEventListener('scroll', fn, { passive: true, capture: true })
+    return () => document.removeEventListener('scroll', fn, { capture: true })
+  }, [onCancel])
+
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (!triggerRef.current?.contains(e.target as Node) && !listRef.current?.contains(e.target as Node)) onCancel()
+    }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [onCancel])
+
+  useEffect(() => {
+    listRef.current?.querySelector(`[data-idx="${highlighted}"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [highlighted])
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted(h => Math.min(h + 1, totalOptions - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted(h => Math.max(h - 1, 0)) }
+    else if (e.key === 'Enter') {
+      e.preventDefault()
+      const item = displayGroups.flatMap(g => g.options).find(o => o._idx === highlighted)
+      if (item) onCommit(item.value)
+    }
+    else if (e.key === 'Escape') { e.preventDefault(); onCancel() }
+  }
+
+  const dropStyle: React.CSSProperties = {
+    position: 'fixed',
+    left: dropPos?.left,
+    width: dropPos?.width,
+    top: dropPos?.top,
+    bottom: dropPos?.bottom,
+    zIndex: 9999,
+    background: '#fff',
+    border: '1px solid var(--ink)',
+    borderRadius: 2,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+    maxHeight: 300,
+    overflowY: 'auto',
+    fontFamily: 'Courier Prime, monospace',
+    fontSize: 12,
+  }
+
+  return (
+    <>
+      <div ref={triggerRef} style={{ display: 'flex', alignItems: 'center' }}>
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={e => { setQuery(e.target.value); setHighlighted(0) }}
+          onKeyDown={handleKeyDown}
+          placeholder={initialValue || 'Rechercher…'}
+          style={{ width: '100%', minWidth: 140, fontSize: 12, padding: '2px 6px', border: '1px solid var(--ink)', borderRadius: 2, fontFamily: 'Courier Prime, monospace', outline: 'none' }}
+        />
+      </div>
+      {dropPos && createPortal(
+        <div ref={listRef} style={dropStyle} onMouseDown={e => e.preventDefault()}>
+          {totalOptions === 0
+            ? <div style={{ padding: '8px 12px', color: 'var(--pencil)' }}>Aucun résultat</div>
+            : displayGroups.map((group, gi) => (
+              <div key={gi}>
+                {group.group && (
+                  <div style={{ padding: '6px 10px 2px', fontSize: 10, fontWeight: 700, color: 'var(--pencil)', textTransform: 'uppercase', letterSpacing: '0.05em', background: 'var(--offwhite)', borderBottom: '1px solid var(--rule)' }}>
+                    {group.group}
+                  </div>
+                )}
+                {group.options.map(opt => (
+                  <div
+                    key={opt.value}
+                    data-idx={opt._idx}
+                    onClick={() => onCommit(opt.value)}
+                    onMouseEnter={() => setHighlighted(opt._idx)}
+                    style={{
+                      padding: '6px 10px',
+                      cursor: 'pointer',
+                      background: opt._idx === highlighted ? 'var(--ink)' : opt.value === initialValue ? 'var(--offwhite)' : '#fff',
+                      color: opt._idx === highlighted ? '#fff' : 'var(--ink)',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    <span style={{ width: 12, flexShrink: 0, color: opt._idx === highlighted ? '#fff' : '#16a34a' }}>{opt.value === initialValue ? '✓' : ''}</span>
+                    {opt.label}
+                  </div>
+                ))}
+              </div>
+            ))
+          }
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
+
+// ── InlineCell (self-contained per-cell state) ────────────────────────────────
+
+type SaveFn = (row: AnyRow, field: string, value: string) => Promise<void>
+
+function InlineCell({ row, field, display, editType, value, options, groups, onSave, onSplitClick }: {
+  row: AnyRow
+  field: string
+  display: React.ReactNode
+  editType?: string
+  value: string
+  options?: { value: string; label: string }[]
+  groups?: CatGroup[]
+  onSave: SaveFn
   onSplitClick?: () => void
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  useEffect(() => { if (isEditing && inputRef.current) inputRef.current.focus() }, [isEditing])
+  const [editing, setEditing] = useState(false)
+  const [editVal, setEditVal] = useState('')
+  const [saveStatus, setSaveStatus] = useState<null | 'saving' | 'saved' | 'error'>(null)
+  const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  if (!editType) return <>{display}</>
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
-  if (isEditing) {
+  useEffect(() => {
+    if (editing && inputRef.current && editType !== 'combobox' && editType !== 'pills') {
+      inputRef.current.focus({ preventScroll: true })
+      if (editType !== 'select') (inputRef.current as HTMLInputElement).select?.()
+    }
+  }, [editing, editType])
+
+  function startEdit(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!editType) return
+    setEditVal(value)
+    setEditing(true)
+  }
+
+  async function commit(override?: string) {
+    const rawVal = override !== undefined ? override : editVal
+    setEditing(false)
+    if (String(rawVal) === String(value)) return
+    setSaveStatus('saving')
+    if (timerRef.current) clearTimeout(timerRef.current)
+    try {
+      await onSave(row, field, rawVal)
+      setSaveStatus('saved')
+      timerRef.current = setTimeout(() => setSaveStatus(null), 1500)
+    } catch {
+      setSaveStatus('error')
+      timerRef.current = setTimeout(() => setSaveStatus(null), 2500)
+    }
+  }
+
+  function cancel() { setEditing(false) }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') { e.preventDefault(); commit() }
+    if (e.key === 'Escape') { e.stopPropagation(); cancel() }
+  }
+
+  const statusColor = saveStatus === 'saving' ? 'var(--pencil)' : saveStatus === 'saved' ? '#16a34a' : saveStatus === 'error' ? '#dc2626' : undefined
+
+  if (editing) {
+    if (editType === 'combobox' && groups) {
+      return (
+        <InlineCombobox
+          groups={groups}
+          initialValue={editVal}
+          onCommit={v => commit(v)}
+          onCancel={cancel}
+        />
+      )
+    }
     if (editType === 'pills') {
       return (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', alignItems: 'center' }}>
           {(options ?? []).map(o => (
             <button key={o.value} type="button"
-              style={{ padding: '2px 8px', fontSize: 11, border: '1px solid', borderRadius: 2, cursor: 'pointer', background: editingValue === o.value ? 'var(--ink)' : '#fff', color: editingValue === o.value ? '#fff' : 'var(--ink)', fontFamily: 'Courier Prime,monospace' }}
-              onClick={() => { setEditingValue(o.value); onSave(o.value) }}>
+              style={{ padding: '2px 7px', fontSize: 11, border: '1px solid', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap', background: editVal === o.value ? 'var(--ink)' : '#fff', color: editVal === o.value ? '#fff' : 'var(--ink)', borderColor: 'var(--ink)', fontFamily: 'Courier Prime, monospace' }}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => commit(o.value)}>
               {o.label}
             </button>
           ))}
-          <button type="button" style={{ padding: '2px 4px', fontSize: 11, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--pencil)' }}
-            onClick={() => onSave(editingValue)}>✕</button>
+          <button type="button" style={{ padding: '2px 4px', fontSize: 11, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--pencil)' }} onClick={cancel}>✕</button>
         </div>
       )
     }
     if (editType === 'select') {
       return (
-        <select autoFocus value={editingValue} style={{ fontSize: 12, padding: '2px 4px', border: '1px solid var(--ink)', borderRadius: 2, fontFamily: 'Courier Prime,monospace' }}
-          onChange={e => setEditingValue(e.target.value)}
-          onBlur={() => onSave(editingValue)}>
+        <select
+          ref={inputRef as React.RefObject<HTMLSelectElement>}
+          value={editVal}
+          onChange={e => setEditVal(e.target.value)}
+          onBlur={() => commit()}
+          onKeyDown={handleKeyDown}
+          style={{ fontSize: 12, padding: '2px 4px', border: '1px solid var(--ink)', borderRadius: 2, fontFamily: 'Courier Prime, monospace' }}
+        >
           {(options ?? []).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       )
     }
-    if (editType === 'combobox') {
-      const listId = `cat-list-${rowKey}-${field}`
-      return (
-        <div style={{ position: 'relative' }}>
-          <input ref={inputRef} list={listId} value={editingValue}
-            style={{ fontSize: 12, padding: '2px 4px', border: '1px solid var(--ink)', borderRadius: 2, fontFamily: 'Courier Prime,monospace', width: 160 }}
-            onChange={e => setEditingValue(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onSave(editingValue) } if (e.key === 'Escape') onSave(value) }}
-            onBlur={() => onSave(editingValue)} />
-          <datalist id={listId}>
-            {(catOptions ?? []).map(c => <option key={c} value={c} />)}
-          </datalist>
-        </div>
-      )
-    }
-    // date, number, text
     return (
-      <input ref={inputRef} type={editType} value={editingValue} step={editType === 'number' ? '0.01' : undefined}
-        style={{ fontSize: 12, padding: '2px 4px', border: '1px solid var(--ink)', borderRadius: 2, fontFamily: 'Courier Prime,monospace', width: editType === 'date' ? 120 : editType === 'number' ? 80 : 130 }}
-        onChange={e => setEditingValue(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onSave(editingValue) } if (e.key === 'Escape') onSave(value) }}
-        onBlur={() => onSave(editingValue)} />
+      <input
+        ref={inputRef as React.RefObject<HTMLInputElement>}
+        type={editType}
+        value={editVal}
+        onChange={e => setEditVal(e.target.value)}
+        onBlur={() => commit()}
+        onKeyDown={handleKeyDown}
+        step={editType === 'number' ? '0.01' : undefined}
+        style={{ fontSize: 12, padding: '2px 4px', border: '1px solid var(--ink)', borderRadius: 2, fontFamily: 'Courier Prime, monospace', width: editType === 'date' ? 120 : editType === 'number' ? 90 : 130 }}
+      />
     )
   }
 
   if (field === 'taux_tva') {
     return (
-      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span style={{ cursor: 'pointer' }} onClick={() => onStartEdit(rowKey, field, value)}>{display}</span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ cursor: editType ? 'pointer' : 'default' }} onClick={editType ? startEdit : undefined}>{display}</span>
         {onSplitClick && (
-          <button type="button" title="Ventiler la TVA" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onSplitClick() }}
+          <button type="button" title="Ventiler la TVA"
+            onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onSplitClick() }}
             style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 2, cursor: 'pointer', fontSize: 10, padding: '1px 4px', color: 'var(--pencil)', lineHeight: 1 }}>⊞</button>
         )}
+        {saveStatus && <span style={{ fontSize: 10, color: statusColor }}>
+          {saveStatus === 'saving' ? '···' : saveStatus === 'saved' ? '✓' : '✕'}
+        </span>}
       </span>
     )
   }
 
   return (
-    <span style={{ cursor: 'pointer', display: 'block', minHeight: 20 }}
-      onClick={() => onStartEdit(rowKey, field, value)}
-      title="Cliquer pour modifier">
-      {display}
+    <span
+      onClick={editType ? startEdit : undefined}
+      title={editType ? 'Cliquer pour modifier' : undefined}
+      style={{ cursor: editType ? 'pointer' : 'default', display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 20 }}
+    >
+      <span>{display}</span>
+      {saveStatus && <span style={{ fontSize: 10, color: statusColor }}>
+        {saveStatus === 'saving' ? '···' : saveStatus === 'saved' ? '✓' : '✕'}
+      </span>}
     </span>
   )
 }
@@ -404,6 +610,7 @@ export default function TransactionsPage() {
   const [factures, setFactures] = useState<Facture[]>([])
   const [depenses, setDepenses] = useState<Depense[]>([])
   const [workspaceId, setWorkspaceId] = useState('')
+  const [activiteType, setActiviteType] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -431,10 +638,6 @@ export default function TransactionsPage() {
   const [pendingCat, setPendingCat] = useState<PendingCat | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  // Inline editing
-  const [editingCell, setEditingCell] = useState<{ rowKey: string; field: string } | null>(null)
-  const [editingValue, setEditingValue] = useState('')
-
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try {
@@ -444,10 +647,12 @@ export default function TransactionsPage() {
       const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
       if (!m) { setError('Workspace introuvable'); return }
       setWorkspaceId(m.workspace_id)
-      const [{ data: f, error: fe }, { data: d, error: de }] = await Promise.all([
+      const [{ data: ws }, { data: f, error: fe }, { data: d, error: de }] = await Promise.all([
+        supabase.from('workspaces').select('activite_type').eq('id', m.workspace_id).single(),
         supabase.from('factures').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(500),
         supabase.from('depenses').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(500),
       ])
+      if (ws?.activite_type) setActiviteType(ws.activite_type)
       if (fe || de) { setError((fe ?? de)?.message ?? 'Erreur de chargement'); return }
       setFactures((f ?? []) as Facture[])
       setDepenses((d ?? []) as Depense[])
@@ -455,8 +660,6 @@ export default function TransactionsPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
-
-  // Reset page when filters change
   useEffect(() => { setPage(1) }, [filterTiers, filterDateFrom, filterDateTo, filterCategorie, filterStatut, tab])
 
   // ── Rows ───────────────────────────────────────────────────────────────────
@@ -486,61 +689,49 @@ export default function TransactionsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-
   const hasFilters = !!(filterTiers || filterDateFrom || filterDateTo || filterCategorie || filterStatut)
 
-  // ── Cell save logic ────────────────────────────────────────────────────────
+  // ── Cell save ──────────────────────────────────────────────────────────────
 
-  function startEditing(rowKey: string, field: string, value: string) {
-    setEditingCell({ rowKey, field })
-    setEditingValue(value)
-  }
-
-  async function handleCellSave(row: AnyRow, field: string, rawValue: string) {
-    setEditingCell(null)
+  const handleCellSave: SaveFn = useCallback(async (row, field, rawValue) => {
     const supabase = createClient()
     const isEntree = row._type === 'entree'
 
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let patch: Record<string, any>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let patch: Record<string, any>
 
-      if (field === 'taux_tva') {
-        if (row.taux_tva === -1) return // multi-TVA, use split panel
-        const taux = parseFloat(rawValue) || 0
-        patch = { taux_tva: taux, montant_ht: round2(row.montant_ttc / (1 + taux / 100)), montant_tva: round2(row.montant_ttc - round2(row.montant_ttc / (1 + taux / 100))) }
-      } else if (field === 'montant_ttc') {
-        const ttc = round2(parseFloat(rawValue) || 0)
-        const taux = row.taux_tva >= 0 ? row.taux_tva : 0
-        patch = recalcFromTtc(ttc, taux)
-      } else if (field === 'categorie') {
-        // Check for propagation
-        const tiers = isEntree ? (row as Facture & { _type: 'entree'; _key: string }).client : (row as Depense & { _type: 'sortie'; _key: string }).fournisseur
-        const pool = (isEntree ? allRows.filter(r => r._type === 'entree') : allRows.filter(r => r._type === 'sortie')) as AnyRow[]
-        const tiersKey = isEntree ? 'client' : 'fournisseur'
-        const matches = pool.filter(r => (r as unknown as Record<string,unknown>)[tiersKey] === tiers && r.id !== row.id && r.categorie !== rawValue)
-        if (matches.length > 0) {
-          setPendingCat({ row, newCategory: rawValue, matchingRows: matches, isEntree })
-          // Apply to current row immediately
-          if (isEntree) await supabase.from('factures').update({ categorie: rawValue }).eq('id', row.id)
-          else await supabase.from('depenses').update({ categorie: rawValue }).eq('id', row.id)
-          await load()
-          return
-        }
-        patch = { categorie: rawValue }
-      } else {
-        patch = { [field]: rawValue }
+    if (field === 'taux_tva') {
+      if (row.taux_tva === -1) return
+      const taux = parseFloat(rawValue) || 0
+      patch = { taux_tva: taux, montant_ht: round2(row.montant_ttc / (1 + taux / 100)), montant_tva: round2(row.montant_ttc - round2(row.montant_ttc / (1 + taux / 100))) }
+    } else if (field === 'montant_ttc') {
+      const ttc = round2(parseFloat(rawValue) || 0)
+      const taux = row.taux_tva >= 0 ? row.taux_tva : 0
+      patch = recalcFromTtc(ttc, taux)
+    } else if (field === 'categorie') {
+      const tiers = isEntree ? (row as Facture & { _type: 'entree'; _key: string }).client : (row as Depense & { _type: 'sortie'; _key: string }).fournisseur
+      const pool = (isEntree ? allRows.filter(r => r._type === 'entree') : allRows.filter(r => r._type === 'sortie')) as AnyRow[]
+      const tiersKey = isEntree ? 'client' : 'fournisseur'
+      const matches = pool.filter(r => (r as unknown as Record<string, unknown>)[tiersKey] === tiers && r.id !== row.id && r.categorie !== rawValue)
+      if (matches.length > 0) {
+        setPendingCat({ row, newCategory: rawValue, matchingRows: matches, isEntree })
+        if (isEntree) await supabase.from('factures').update({ categorie: rawValue }).eq('id', row.id)
+        else await supabase.from('depenses').update({ categorie: rawValue }).eq('id', row.id)
+        await load()
+        return
       }
+      patch = { categorie: rawValue }
+    } else {
+      patch = { [field]: rawValue }
+    }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (isEntree) await supabase.from('factures').update(patch as any).eq('id', row.id)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      else await supabase.from('depenses').update(patch as any).eq('id', row.id)
-      // Optimistic update
-      if (isEntree) setFactures(fs => fs.map(f => f.id === row.id ? { ...f, ...patch } : f))
-      else setDepenses(ds => ds.map(d => d.id === row.id ? { ...d, ...patch } : d))
-    } catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Erreur'); load() }
-  }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (isEntree) await supabase.from('factures').update(patch as any).eq('id', row.id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    else await supabase.from('depenses').update(patch as any).eq('id', row.id)
+    if (isEntree) setFactures(fs => fs.map(f => f.id === row.id ? { ...f, ...patch } : f))
+    else setDepenses(ds => ds.map(d => d.id === row.id ? { ...d, ...patch } : d))
+  }, [allRows, load])
 
   async function handleSplitSave(row: AnyRow, lines: TvaLineData[]) {
     const supabase = createClient()
@@ -549,16 +740,14 @@ export default function TransactionsPage() {
     const patch = { taux_tva: -1, montant_ht: totalHt, montant_tva: totalTva, tva_lines: lines }
     if (row._type === 'entree') await supabase.from('factures').update(patch).eq('id', row.id)
     else await supabase.from('depenses').update(patch).eq('id', row.id)
-    setSplitTarget(null)
-    await load()
+    setSplitTarget(null); await load()
   }
 
   async function handleDelete(row: AnyRow) {
     const supabase = createClient()
     if (row._type === 'entree') await supabase.from('factures').delete().eq('id', row.id)
     else await supabase.from('depenses').delete().eq('id', row.id)
-    setConfirmDelete(null)
-    await load()
+    setConfirmDelete(null); await load()
   }
 
   async function handleBulkDelete() {
@@ -602,15 +791,13 @@ export default function TransactionsPage() {
     setSelectedIds(s => { const n = new Set(s); allSelected ? allKeys.forEach(k => n.delete(k)) : allKeys.forEach(k => n.add(k)); return n })
   }
 
-  // ── Columns ────────────────────────────────────────────────────────────────
+  // ── Row render ─────────────────────────────────────────────────────────────
 
   function renderRow(row: AnyRow) {
     const isEntree = row._type === 'entree'
     const tiers = isEntree ? (row as Facture & { _type: 'entree'; _key: string }).client : (row as Depense & { _type: 'sortie'; _key: string }).fournisseur
     const key = row._key
-    const isCellEditing = (field: string) => editingCell?.rowKey === key && editingCell?.field === field
-
-    const cats = isEntree ? CAT_ENTREES : CAT_SORTIES
+    const catGroups = isEntree ? getCatEntreesGroups(activiteType) : getCatSortiesGroups(activiteType)
     const statutOptions = [{ value: 'payee', label: 'Payée' }, { value: 'en_attente', label: 'En attente' }]
     const tvaOptions = TVA_RATES.map(v => ({ value: v, label: `${v} %` }))
 
@@ -631,40 +818,32 @@ export default function TransactionsPage() {
           </td>
         )}
         <td>
-          <InlineCell rowKey={key} field="date" editType="date" value={row.date}
-            display={row.date} options={[]} onStartEdit={startEditing} onSave={v => handleCellSave(row, 'date', v)}
-            isEditing={isCellEditing('date')} editingValue={editingValue} setEditingValue={setEditingValue} />
+          <InlineCell row={row} field="date" editType="date" value={row.date}
+            display={row.date} onSave={handleCellSave} />
         </td>
         <td>
-          <InlineCell rowKey={key} field={isEntree ? 'client' : 'fournisseur'} editType="text" value={tiers}
-            display={tiers || '—'} onStartEdit={startEditing} onSave={v => handleCellSave(row, isEntree ? 'client' : 'fournisseur', v)}
-            isEditing={isCellEditing(isEntree ? 'client' : 'fournisseur')} editingValue={editingValue} setEditingValue={setEditingValue} />
+          <InlineCell row={row} field={isEntree ? 'client' : 'fournisseur'} editType="text" value={tiers}
+            display={tiers || '—'} onSave={handleCellSave} />
         </td>
         <td className="right" style={{ fontFamily: 'Courier Prime,monospace', fontSize: 13 }}>{formatEur(row.montant_ht)}</td>
         <td className="center">
-          <InlineCell rowKey={key} field="taux_tva" editType={row.taux_tva === -1 ? undefined : 'pills'} value={String(row.taux_tva)}
-            display={tvaBadge} options={tvaOptions} onStartEdit={startEditing}
-            onSave={v => handleCellSave(row, 'taux_tva', v)}
-            isEditing={isCellEditing('taux_tva')} editingValue={editingValue} setEditingValue={setEditingValue}
+          <InlineCell row={row} field="taux_tva" editType={row.taux_tva === -1 ? undefined : 'pills'} value={String(row.taux_tva)}
+            display={tvaBadge} options={tvaOptions} onSave={handleCellSave}
             onSplitClick={() => setSplitTarget(row)} />
         </td>
         <td className="right">
-          <InlineCell rowKey={key} field="montant_ttc" editType="number" value={String(row.montant_ttc)}
-            display={<strong>{formatEur(row.montant_ttc)}</strong>} onStartEdit={startEditing}
-            onSave={v => handleCellSave(row, 'montant_ttc', v)}
-            isEditing={isCellEditing('montant_ttc')} editingValue={editingValue} setEditingValue={setEditingValue} />
+          <InlineCell row={row} field="montant_ttc" editType="number" value={String(row.montant_ttc)}
+            display={<strong>{formatEur(row.montant_ttc)}</strong>} onSave={handleCellSave} />
         </td>
         <td>
-          <InlineCell rowKey={key} field="categorie" editType="combobox" value={row.categorie ?? ''}
-            display={<span style={{ fontSize: 12, color: 'var(--pencil)' }}>{row.categorie}</span>} catOptions={cats}
-            onStartEdit={startEditing} onSave={v => handleCellSave(row, 'categorie', v)}
-            isEditing={isCellEditing('categorie')} editingValue={editingValue} setEditingValue={setEditingValue} />
+          <InlineCell row={row} field="categorie" editType="combobox" value={row.categorie ?? ''}
+            display={<span style={{ fontSize: 12, color: 'var(--pencil)', maxWidth: 200, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom' }}>{row.categorie || '—'}</span>}
+            groups={catGroups} onSave={handleCellSave} />
         </td>
         <td>
-          <InlineCell rowKey={key} field="statut" editType="select" value={row.statut}
+          <InlineCell row={row} field="statut" editType="select" value={row.statut}
             display={<span className={`dash-badge ${row.statut === 'payee' ? 'dash-badge-green' : 'dash-badge-orange'}`}>{row.statut === 'payee' ? 'Payée' : 'En attente'}</span>}
-            options={statutOptions} onStartEdit={startEditing} onSave={v => handleCellSave(row, 'statut', v)}
-            isEditing={isCellEditing('statut')} editingValue={editingValue} setEditingValue={setEditingValue} />
+            options={statutOptions} onSave={handleCellSave} />
         </td>
         <td className="center" style={{ fontSize: 12, color: row.has_attachment ? '#16a34a' : 'var(--pencil)' }}>
           {row.bank_source ? (row.has_attachment ? '📎' : '—') : null}
@@ -798,11 +977,11 @@ export default function TransactionsPage() {
       {/* ── Modals ────────────────────────────────────────────────────────── */}
 
       {showForm && (tab === 'entrees' || (tab === 'tous' && editFact)) && (
-        <FactureModal initial={editFact} factures={factures} workspaceId={workspaceId}
+        <FactureModal initial={editFact} factures={factures} workspaceId={workspaceId} activiteType={activiteType}
           onSaved={() => { setShowForm(false); setEditFact(null); load() }} onClose={() => { setShowForm(false); setEditFact(null) }} />
       )}
       {showForm && (tab === 'sorties' || (tab === 'tous' && editDep)) && (
-        <DepenseModal initial={editDep} workspaceId={workspaceId}
+        <DepenseModal initial={editDep} workspaceId={workspaceId} activiteType={activiteType}
           onSaved={() => { setShowForm(false); setEditDep(null); load() }} onClose={() => { setShowForm(false); setEditDep(null) }} />
       )}
 
