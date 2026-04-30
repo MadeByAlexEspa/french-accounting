@@ -47,7 +47,7 @@ export default function NotesDefraisPage() {
       if (!m) { setError('Workspace introuvable.'); return }
       setWorkspaceId(m.workspace_id)
       const { data: d, error: de } = await supabase.from('depenses').select('*')
-        .eq('workspace_id', m.workspace_id).not('bank_source', 'is', null).order('date', { ascending: false })
+        .eq('workspace_id', m.workspace_id).or('bank_source.eq.note_de_frais,bank_source.ilike.upload:%').order('date', { ascending: false })
       if (de) { setError(de.message); return }
       setDepenses((d ?? []) as Depense[])
     } finally {
