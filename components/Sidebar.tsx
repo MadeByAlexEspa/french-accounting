@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -23,8 +24,19 @@ interface Props {
 }
 
 export default function Sidebar({ workspace, userEmail }: Props) {
+  const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
   const router   = useRouter()
+
+  // Close drawer on route change
+  useEffect(() => { setMobileOpen(false) }, [pathname])
+
+  // Prevent body scroll when drawer open
+  useEffect(() => {
+    if (mobileOpen) document.body.style.overflow = 'hidden'
+    else document.body.style.overflow = ''
+    return () => { document.body.style.overflow = '' }
+  }, [mobileOpen])
 
   async function handleLogout() {
     const supabase = createClient()
@@ -33,12 +45,10 @@ export default function Sidebar({ workspace, userEmail }: Props) {
     router.refresh()
   }
 
-  function isActive(href: string) {
-    return pathname.startsWith(href)
-  }
+  function isActive(href: string) { return pathname.startsWith(href) }
 
-  return (
-    <aside className="sb-sidebar">
+  const navContent = (
+    <>
       <div className="sb-brand">
         <span className="sb-brand-name">✎ Compte-Pote</span>
       </div>
@@ -51,11 +61,7 @@ export default function Sidebar({ workspace, userEmail }: Props) {
 
       <nav className="sb-nav">
         {NAV_MAIN.map(({ href, label }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`sb-item ${isActive(href) ? 'sb-item-active' : ''}`}
-          >
+          <Link key={href} href={href} className={`sb-item ${isActive(href) ? 'sb-item-active' : ''}`}>
             {label}
           </Link>
         ))}
@@ -64,11 +70,7 @@ export default function Sidebar({ workspace, userEmail }: Props) {
       <div className="sb-footer">
         <div className="sb-footer-section">
           {NAV_FOOTER.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className={`sb-item ${isActive(href) ? 'sb-item-active' : ''}`}
-            >
+            <Link key={href} href={href} className={`sb-item ${isActive(href) ? 'sb-item-active' : ''}`}>
               {label}
             </Link>
           ))}
@@ -77,6 +79,33 @@ export default function Sidebar({ workspace, userEmail }: Props) {
           Déconnexion
         </button>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* Mobile top bar */}
+      <header className="sb-topbar">
+        <button
+          className="sb-hamburger"
+          onClick={() => setMobileOpen(v => !v)}
+          aria-label={mobileOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+        >
+          {mobileOpen ? '✕' : '☰'}
+        </button>
+        <span className="sb-topbar-logo">✎ Compte-Pote</span>
+        <div style={{ width: 40 }} />
+      </header>
+
+      {/* Backdrop */}
+      {mobileOpen && (
+        <div className="sb-overlay" onClick={() => setMobileOpen(false)} aria-hidden="true" />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`sb-sidebar${mobileOpen ? ' sb-sidebar-open' : ''}`}>
+        {navContent}
+      </aside>
+    </>
   )
 }
