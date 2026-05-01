@@ -4,13 +4,11 @@ import { randomBytes } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { sendInvitationEmail } from '@/lib/email'
 
-// Columns returned to client — token intentionally excluded
-const INVITATION_COLS = 'id, email, role, expires_at, used_at, created_at' as const
-
 export type InvitationRow = {
   id: string
   email: string
   role: string
+  token: string
   expires_at: string
   used_at: string | null
   created_at: string
@@ -33,6 +31,14 @@ async function getWorkspaceCtx(): Promise<{
     .single()
   if (!m) return null
   return { workspaceId: m.workspace_id, userId: user.id, role: m.role }
+}
+
+async function buildInviteUrl(token: string, workspaceId: string, supabase: Awaited<ReturnType<typeof createClient>>): Promise<{ url: string; wsName: string }> {
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+  const { data: ws } = await supabase.from('workspaces').select('name').eq('id', workspaceId).single()
+  return { url: `${appUrl}/invite/${token}`, wsName: ws?.name ?? 'votre équipe' }
 }
 
 export async function createInvitation(
@@ -71,18 +77,8 @@ export async function createInvitation(
 
   if (insertError) return { error: insertError.message }
 
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
-  const inviteUrl = `${appUrl}/invite/${token}`
-
-  const { data: ws } = await supabase
-    .from('workspaces')
-    .select('name')
-    .eq('id', ctx.workspaceId)
-    .single()
-
-  sendInvitationEmail(email, ws?.name ?? 'votre équipe', inviteUrl).catch(() => {})
+  const { url: inviteUrl, wsName } = await buildInviteUrl(token, ctx.workspaceId, supabase)
+  sendInvitationEmail(email, wsName, inviteUrl).catch(() => {})
 
   return { inviteUrl }
 }
@@ -92,14 +88,20 @@ export async function listInvitations(): Promise<{ data?: InvitationRow[]; error
   if (!ctx) return { error: 'Session expirée.' }
 
   const supabase = await createClient()
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
+
+  // Cleanup: delete accepted invitations older than 1 day
+  const oneDayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+  await supabase
+    .from('invitations')
+    .delete()
+    .eq('workspace_id', ctx.workspaceId)
+    .not('used_at', 'is', null)
+    .lt('used_at', oneDayAgo)
 
   const { data, error } = await supabase
     .from('invitations')
-    .select(INVITATION_COLS)
+    .select('id, email, role, token, expires_at, used_at, created_at')
     .eq('workspace_id', ctx.workspaceId)
-    .or(`used_at.not.is.null,expires_at.gt.${new Date().toISOString()}`)
-    .gt('created_at', sevenDaysAgo)
     .order('created_at', { ascending: false })
 
   if (error) return { error: error.message }
@@ -122,4 +124,44 @@ export async function cancelInvitation(id: string): Promise<{ error?: string }> 
   if (error) return { error: error.message }
   if (!count || count === 0) return { error: 'Invitation introuvable ou déjà utilisée.' }
   return {}
+}
+
+export async function resendInvitation(id: string): Promise<{ error?: string; inviteUrl?: string }> {
+  const ctx = await getWorkspaceCtx()
+  if (!ctx) return { error: 'Session expirée.' }
+  if (ctx.role === 'member') return { error: 'Droits insuffisants.' }
+
+  const supabase = await createClient()
+
+  const { data: inv } = await supabase
+    .from('invitations')
+    .select('email, used_at, workspace_id')
+    .eq('id', id)
+    .eq('workspace_id', ctx.workspaceId)
+    .maybeSingle()
+
+  if (!inv) return { error: 'Invitation introuvable.' }
+  if (inv.used_at) return { error: 'Invitation déjà acceptée.' }
+
+  // Delete old and create fresh (new token + reset expiry)
+  await supabase.from('invitations').delete().eq('id', id)
+
+  const token = randomBytes(32).toString('hex')
+  const expires_at = new Date(Date.now() + 48 * 3600 * 1000).toISOString()
+
+  const { error: insertError } = await supabase.from('invitations').insert({
+    workspace_id: ctx.workspaceId,
+    email: inv.email,
+    role: 'member',
+    token,
+    invited_by: ctx.userId,
+    expires_at,
+  })
+
+  if (insertError) return { error: insertError.message }
+
+  const { url: inviteUrl, wsName } = await buildInviteUrl(token, ctx.workspaceId, supabase)
+  sendInvitationEmail(inv.email, wsName, inviteUrl).catch(() => {})
+
+  return { inviteUrl }
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Workspace } from '@/lib/types/database'
-import { createInvitation, listInvitations, cancelInvitation, type InvitationRow } from './actions'
+import { createInvitation, listInvitations, cancelInvitation, resendInvitation, type InvitationRow } from './actions'
 
 const ACTIVITE_OPTIONS = [
   { value: '',             label: '— Non renseigné —' },
@@ -168,16 +168,30 @@ function ProfileSection({ ws, onSaved }: { ws: WorkspaceData; onSaved: () => voi
   )
 }
 
+function daysSince(dateStr: string): string {
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 3600 * 24))
+  if (days === 0) return "aujourd'hui"
+  if (days === 1) return 'il y a 1 jour'
+  return `il y a ${days} jours`
+}
+
+function inviteStatus(inv: InvitationRow): { label: string; cls: string } {
+  if (inv.used_at) return { label: 'Acceptée', cls: 'dash-badge-green' }
+  if (new Date(inv.expires_at) < new Date()) return { label: 'Expirée', cls: 'dash-badge-red' }
+  return { label: 'Envoyée', cls: 'dash-badge-blue' }
+}
+
 function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
   members: WorkspaceData['members']; workspaceId: string; currentUserId: string; onChanged: () => void
 }) {
-  const [invitations, setInvitations]   = useState<InvitationRow[]>([])
+  const [invitations, setInvitations]     = useState<InvitationRow[]>([])
   const [showInviteForm, setShowInviteForm] = useState(false)
-  const [inviteEmail, setInviteEmail]   = useState('')
-  const [inviting, setInviting]         = useState(false)
-  const [inviteError, setInviteError]   = useState<string|null>(null)
-  const [generatedUrl, setGeneratedUrl] = useState<string|null>(null)
-  const [copied, setCopied]             = useState(false)
+  const [inviteEmail, setInviteEmail]     = useState('')
+  const [inviting, setInviting]           = useState(false)
+  const [inviteError, setInviteError]     = useState<string|null>(null)
+  const [generatedUrl, setGeneratedUrl]   = useState<string|null>(null)
+  const [copiedId, setCopiedId]           = useState<string|null>(null)
+  const [resendingId, setResendingId]     = useState<string|null>(null)
 
   const loadInvitations = useCallback(async () => {
     const res = await listInvitations()
@@ -197,27 +211,36 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
     loadInvitations()
   }
 
-  async function handleCopy(url: string) {
-    await navigator.clipboard.writeText(url)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  async function handleCopy(text: string, id: string) {
+    await navigator.clipboard.writeText(text)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
   }
 
   async function handleCancel(id: string) {
+    if (!confirm('Annuler cette invitation ?')) return
     const res = await cancelInvitation(id)
     if (!res.error) loadInvitations()
   }
 
-  function inviteStatus(inv: InvitationRow): { label: string; cls: string } {
-    if (inv.used_at) return { label: 'Acceptée', cls: 'dash-badge-green' }
-    if (new Date(inv.expires_at) < new Date()) return { label: 'Expirée', cls: 'dash-badge-red' }
-    return { label: 'En attente', cls: 'dash-badge-blue' }
+  async function handleResend(id: string) {
+    setResendingId(id)
+    const res = await resendInvitation(id)
+    setResendingId(null)
+    if (res.error) { alert(res.error); return }
+    loadInvitations()
   }
+
+  const appUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/invite/`
+      : '/invite/'
 
   const pendingCount = invitations.filter(i => !i.used_at && new Date(i.expires_at) >= new Date()).length
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
       {/* Members table */}
       <div className="dash-card">
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
@@ -241,7 +264,7 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
                 />
               </div>
               <button type="submit" className="dash-btn" disabled={inviting}>
-                {inviting ? 'Envoi…' : 'Envoyer l\'invitation'}
+                {inviting ? 'Envoi…' : "Envoyer l'invitation"}
               </button>
             </form>
             {inviteError && <div className="dash-error" style={{ marginTop:10 }}>{inviteError}</div>}
@@ -250,8 +273,8 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
                 <span style={{ fontSize:12, color:'var(--pencil)', fontFamily:'Courier Prime,monospace', wordBreak:'break-all', flex:1 }}>
                   {generatedUrl}
                 </span>
-                <button className="dash-btn" style={{ flexShrink:0 }} onClick={() => handleCopy(generatedUrl)}>
-                  {copied ? '✓ Copié' : 'Copier'}
+                <button className="dash-btn" style={{ flexShrink:0 }} onClick={() => handleCopy(generatedUrl, 'new')}>
+                  {copiedId === 'new' ? '✓ Copié' : 'Copier'}
                 </button>
               </div>
             )}
@@ -274,41 +297,102 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
         </table></div>
       </div>
 
-      {/* Invitations table */}
-      {invitations.length > 0 && (
-        <div className="dash-card">
-          <div className="dash-card-title">Invitations ({pendingCount} en attente)</div>
-          <div className="dash-table-wrap"><table className="dash-table">
-            <thead><tr><th>Email</th><th>Statut</th><th>Expire le</th><th></th></tr></thead>
-            <tbody>
-              {invitations.map(inv => {
-                const st = inviteStatus(inv)
-                const isPending = !inv.used_at && new Date(inv.expires_at) >= new Date()
-                return (
-                  <tr key={inv.id}>
-                    <td>{inv.email}</td>
-                    <td><span className={`dash-badge ${st.cls}`}>{st.label}</span></td>
-                    <td style={{ fontSize:12, color:'var(--pencil)' }}>
-                      {new Date(inv.expires_at).toLocaleString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
-                    </td>
-                    <td>
-                      {isPending && (
-                        <button
-                          className="dash-btn-ghost"
-                          style={{ fontSize:12, padding:'4px 10px' }}
-                          onClick={() => handleCancel(inv.id)}
-                        >
-                          Annuler
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table></div>
+      {/* Invitations management */}
+      <div className="dash-card">
+        <div className="dash-card-title">
+          Invitations{invitations.length > 0 ? ` — ${pendingCount} en attente` : ''}
         </div>
-      )}
+
+        {invitations.length === 0 ? (
+          <div className="dash-empty" style={{ padding:'16px 0' }}>Aucune invitation envoyée.</div>
+        ) : (
+          <div className="dash-table-wrap">
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Envoyée</th>
+                  <th>Statut</th>
+                  <th>Lien / Token</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {invitations.map(inv => {
+                  const st = inviteStatus(inv)
+                  const isPending = !inv.used_at && new Date(inv.expires_at) >= new Date()
+                  const isExpired = !inv.used_at && new Date(inv.expires_at) < new Date()
+                  const fullUrl = `${appUrl}${inv.token}`
+
+                  return (
+                    <tr key={inv.id}>
+                      <td style={{ fontWeight:500 }}>{inv.email}</td>
+
+                      <td style={{ fontSize:12, color:'var(--pencil)', whiteSpace:'nowrap' }}>
+                        {daysSince(inv.created_at)}
+                      </td>
+
+                      <td>
+                        <span className={`dash-badge ${st.cls}`}>{st.label}</span>
+                      </td>
+
+                      {/* Token + copy */}
+                      <td>
+                        {!inv.used_at && (
+                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            <span style={{
+                              fontFamily:'Courier Prime,monospace', fontSize:11,
+                              color:'var(--pencil)', letterSpacing:'0.02em',
+                              opacity: isExpired ? 0.45 : 1,
+                            }}>
+                              {inv.token.slice(0, 12)}…
+                            </span>
+                            <button
+                              className="dash-btn-ghost"
+                              style={{ fontSize:11, padding:'2px 8px', flexShrink:0 }}
+                              onClick={() => handleCopy(fullUrl, inv.id)}
+                              title="Copier le lien complet"
+                            >
+                              {copiedId === inv.id ? '✓' : 'Copier'}
+                            </button>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td>
+                        <div style={{ display:'flex', gap:6, justifyContent:'flex-end' }}>
+                          {(isPending || isExpired) && (
+                            <button
+                              className="dash-btn-ghost"
+                              style={{ fontSize:12, padding:'4px 10px' }}
+                              disabled={resendingId === inv.id}
+                              onClick={() => handleResend(inv.id)}
+                              title={isExpired ? 'Générer un nouveau lien et renvoyer' : 'Renvoyer le lien'}
+                            >
+                              {resendingId === inv.id ? '…' : isExpired ? 'Renouveler' : 'Renvoyer'}
+                            </button>
+                          )}
+                          {isPending && (
+                            <button
+                              className="dash-btn-ghost"
+                              style={{ fontSize:12, padding:'4px 10px', color:'var(--danger, #dc2626)' }}
+                              onClick={() => handleCancel(inv.id)}
+                            >
+                              Annuler
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
     </div>
   )
 }
