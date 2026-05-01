@@ -194,6 +194,7 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
   const [copiedId, setCopiedId]           = useState<string|null>(null)
   const [resendingId, setResendingId]     = useState<string|null>(null)
   const [resendError, setResendError]     = useState<string|null>(null)
+  const [resendSuccess, setResendSuccess] = useState<string|null>(null)
 
   const loadInvitations = useCallback(async () => {
     const res = await listInvitations()
@@ -226,10 +227,12 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
   }
 
   async function handleResend(id: string) {
-    setResendingId(id); setResendError(null)
+    setResendingId(id); setResendError(null); setResendSuccess(null)
     const res = await resendInvitation(id)
     setResendingId(null)
     if (res.error) { setResendError(res.error); return }
+    setResendSuccess('Invitation renvoyée.')
+    setTimeout(() => setResendSuccess(null), 3000)
     loadInvitations()
   }
 
@@ -304,7 +307,8 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
         <div className="dash-card-title">
           Invitations{invitations.length > 0 ? ` — ${pendingCount} en attente` : ''}
         </div>
-        {resendError && <div className="dash-error" role="alert" style={{ marginBottom:12 }}>{resendError}</div>}
+        {resendError   && <div className="dash-error"       role="alert" style={{ marginBottom:12 }}>{resendError}</div>}
+        {resendSuccess && <div className="dash-success-msg" role="status" style={{ marginBottom:12 }}>{resendSuccess}</div>}
 
         {invitations.length === 0 ? (
           <div className="dash-empty" style={{ padding:'16px 0' }}>Aucune invitation envoyée.</div>
