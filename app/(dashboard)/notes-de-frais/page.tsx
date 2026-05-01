@@ -79,7 +79,8 @@ export default function NotesDefraisPage() {
     e.preventDefault()
     setSubmitting(true); setError(null)
     const supabase = createClient()
-    const ttc = parseFloat(form.montant_ttc.replace(',', '.')) || 0
+    const ttc = parseFloat(form.montant_ttc.replace(',', '.'))
+    if (!ttc || ttc <= 0) { setError('Le montant TTC doit être supérieur à 0.'); setSubmitting(false); return }
     const taux = 20
     const ht = round2(ttc / (1 + taux / 100))
     const tva = round2(ttc - ht)
@@ -135,7 +136,7 @@ export default function NotesDefraisPage() {
                 <div className="dash-field"><label className="dash-field-label">Date</label>
                   <input type="date" className="dash-field-input" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} required /></div>
                 <div className="dash-field"><label className="dash-field-label">Montant TTC (€)</label>
-                  <input type="number" step="0.01" min="0" className="dash-field-input" value={form.montant_ttc} onChange={e=>setForm(f=>({...f,montant_ttc:e.target.value}))} placeholder="0.00" /></div>
+                  <input type="number" step="0.01" min="0.01" className="dash-field-input" value={form.montant_ttc} onChange={e=>setForm(f=>({...f,montant_ttc:e.target.value}))} placeholder="0.00" required /></div>
               </div>
               <div className="dash-field"><label className="dash-field-label">Fournisseur</label>
                 <input type="text" className="dash-field-input" value={form.fournisseur} onChange={e=>setForm(f=>({...f,fournisseur:e.target.value}))} placeholder="Taxi, Restaurant, SNCF…" /></div>

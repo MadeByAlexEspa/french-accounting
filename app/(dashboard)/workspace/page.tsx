@@ -77,18 +77,19 @@ export default function WorkspacePage() {
         <button className={`dash-tab ${tab==='membres'?'dash-tab-active':''}`} onClick={()=>setTab('membres')}>Membres ({ws.members.length})</button>
       </div>
 
-      {tab === 'general' && <GeneralTab ws={ws} onSaved={load} />}
+      {tab === 'general' && <GeneralTab ws={ws} onSaved={load} currentUserId={userId} />}
       {tab === 'membres' && <MembresTab members={ws.members} workspaceId={ws.id} currentUserId={userId} onChanged={load} />}
     </div>
   )
 }
 
-function GeneralTab({ ws, onSaved }: { ws: WorkspaceData; onSaved: () => void }) {
+function GeneralTab({ ws, onSaved, currentUserId }: { ws: WorkspaceData; onSaved: () => void; currentUserId: string }) {
+  const isOwner = ws.members.some(m => m.user_id === currentUserId && m.role === 'owner')
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
       <InfoSection ws={ws} onSaved={onSaved} />
       <ProfileSection ws={ws} onSaved={onSaved} />
-      <DangerSection workspaceId={ws.id} />
+      {isOwner && <DangerSection workspaceId={ws.id} />}
     </div>
   )
 }
@@ -192,6 +193,7 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
   const [generatedUrl, setGeneratedUrl]   = useState<string|null>(null)
   const [copiedId, setCopiedId]           = useState<string|null>(null)
   const [resendingId, setResendingId]     = useState<string|null>(null)
+  const [resendError, setResendError]     = useState<string|null>(null)
 
   const loadInvitations = useCallback(async () => {
     const res = await listInvitations()
@@ -224,10 +226,10 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
   }
 
   async function handleResend(id: string) {
-    setResendingId(id)
+    setResendingId(id); setResendError(null)
     const res = await resendInvitation(id)
     setResendingId(null)
-    if (res.error) { alert(res.error); return }
+    if (res.error) { setResendError(res.error); return }
     loadInvitations()
   }
 
@@ -302,6 +304,7 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
         <div className="dash-card-title">
           Invitations{invitations.length > 0 ? ` — ${pendingCount} en attente` : ''}
         </div>
+        {resendError && <div className="dash-error" role="alert" style={{ marginBottom:12 }}>{resendError}</div>}
 
         {invitations.length === 0 ? (
           <div className="dash-empty" style={{ padding:'16px 0' }}>Aucune invitation envoyée.</div>
@@ -423,19 +426,19 @@ function DangerSection({ workspaceId }: { workspaceId: string }) {
         </div>
         <button className="dash-btn-danger" onClick={()=>setConfirm(true)} type="button">Supprimer</button>
       </div>
-      {error && <div className="dash-error" style={{ marginTop:12 }}>{error}</div>}
+      {error && !confirm && <div className="dash-error" style={{ marginTop:12 }}>{error}</div>}
       {confirm && (
         <div className="dash-modal-backdrop" onClick={()=>setConfirm(false)}>
           <div className="dash-modal" style={{ maxWidth:400 }} onClick={e=>e.stopPropagation()}>
             <div className="dash-modal-header">
               <h2 className="dash-modal-title" style={{ color:'#dc2626' }}>Supprimer le workspace</h2>
-              <button className="dash-modal-close" onClick={()=>setConfirm(false)}>×</button>
+              <button className="dash-modal-close" aria-label="Fermer" onClick={()=>setConfirm(false)}>×</button>
             </div>
             <div className="dash-modal-body">
               <p style={{ fontSize:14, color:'var(--pencil)' }}>
                 Cette action est <strong>irréversible</strong>. Toutes les données du workspace seront définitivement supprimées.
               </p>
-              {error && <div className="dash-error">{error}</div>}
+              {error && <div className="dash-error" role="alert">{error}</div>}
             </div>
             <div className="dash-modal-footer">
               <button className="dash-btn-ghost" onClick={()=>setConfirm(false)} disabled={deleting}>Annuler</button>

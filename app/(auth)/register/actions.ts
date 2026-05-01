@@ -9,6 +9,11 @@ export async function register(params: {
   slug: string
 }) {
   const { email, password, companyName, slug } = params
+
+  if (password.length < 8) return { error: 'Le mot de passe doit contenir au moins 8 caractères.' }
+  if (password.length > 128) return { error: 'Le mot de passe est trop long.' }
+  if (!companyName.trim()) return { error: 'Le nom de l\'entreprise est requis.' }
+
   const service = createServiceClient()
 
   // Admin API creates the user synchronously — no phantom IDs, no race condition

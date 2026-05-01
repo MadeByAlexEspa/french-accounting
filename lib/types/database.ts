@@ -72,7 +72,7 @@ export interface Database {
           id: string
           workspace_id: string
           email: string
-          role: 'owner' | 'admin' | 'member'
+          role: 'admin' | 'member'
           token: string
           invited_by: string
           expires_at: string
@@ -83,7 +83,7 @@ export interface Database {
           id?: string
           workspace_id: string
           email: string
-          role?: 'owner' | 'admin' | 'member'
+          role?: 'admin' | 'member'
           token: string
           invited_by: string
           expires_at: string
@@ -94,7 +94,7 @@ export interface Database {
           id?: string
           workspace_id?: string
           email?: string
-          role?: 'owner' | 'admin' | 'member'
+          role?: 'admin' | 'member'
           token?: string
           invited_by?: string
           expires_at?: string

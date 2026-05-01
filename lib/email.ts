@@ -5,7 +5,7 @@ export async function sendInvitationEmail(
 ): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
-    console.log(`[INVITE] RESEND_API_KEY absent — email non envoyé pour ${to}`)
+    console.log('[INVITE] RESEND_API_KEY absent — email non envoyé')
     return
   }
 

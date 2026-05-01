@@ -38,7 +38,7 @@ export async function acceptInvitation(
 
   if (userErr || !userData.user) {
     const { error: rbErr } = await service.from('invitations').update({ used_at: null }).eq('token', token)
-    if (rbErr) console.error('[acceptInvitation] Rollback échoué — token brûlé:', rbErr.message)
+    if (rbErr) console.error('[acceptInvitation] Rollback échoué — token brûlé')
     if (userErr?.message?.includes('already registered')) {
       return { error: 'Un compte existe déjà avec cette adresse email. Connectez-vous directement.' }
     }
@@ -57,7 +57,7 @@ export async function acceptInvitation(
   if (memberErr) {
     await service.auth.admin.deleteUser(userData.user.id)
     const { error: rbErr } = await service.from('invitations').update({ used_at: null }).eq('token', token)
-    if (rbErr) console.error('[acceptInvitation] Rollback membership échoué:', rbErr.message)
+    if (rbErr) console.error('[acceptInvitation] Rollback membership échoué')
     return { error: memberErr.message }
   }
 
