@@ -7,7 +7,7 @@ CREATE POLICY "memberships_update" ON memberships
   USING (user_id = auth.uid())
   WITH CHECK (
     user_id = auth.uid()
-    AND workspace_id IN (SELECT unnest(auth_workspace_ids()))
+    AND workspace_id IN (SELECT auth_workspace_ids())
     -- role stays unchanged (cannot self-promote via UPDATE)
     AND role = (SELECT role FROM memberships WHERE id = memberships.id LIMIT 1)
   );
@@ -27,7 +27,7 @@ DROP POLICY IF EXISTS "invitations_update_owner_admin" ON invitations;
 CREATE POLICY "invitations_update_owner_admin" ON invitations
   FOR UPDATE
   USING (
-    workspace_id IN (SELECT unnest(auth_workspace_ids()))
+    workspace_id IN (SELECT auth_workspace_ids())
     AND EXISTS (
       SELECT 1 FROM memberships
       WHERE workspace_id = invitations.workspace_id
