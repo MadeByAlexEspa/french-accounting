@@ -23,16 +23,16 @@ export default function AcceptForm({ token, email }: { token: string; email: str
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="dash-field">
-        <label className="dash-field-label">Email</label>
-        <input type="email" className="dash-field-input" value={email} disabled />
+    <form onSubmit={handleSubmit} className="auth-form">
+      <div className="auth-field">
+        <label className="auth-label">Email</label>
+        <input type="email" className="auth-input" value={email} disabled />
       </div>
-      <div className="dash-field">
-        <label className="dash-field-label">Mot de passe</label>
+      <div className="auth-field">
+        <label className="auth-label">Mot de passe</label>
         <input
           type="password"
-          className="dash-field-input"
+          className="auth-input"
           placeholder="Minimum 8 caractères"
           value={password}
           onChange={e => setPassword(e.target.value)}
@@ -41,11 +41,11 @@ export default function AcceptForm({ token, email }: { token: string; email: str
           autoFocus
         />
       </div>
-      <div className="dash-field">
-        <label className="dash-field-label">Confirmer le mot de passe</label>
+      <div className="auth-field">
+        <label className="auth-label">Confirmer le mot de passe</label>
         <input
           type="password"
-          className="dash-field-input"
+          className="auth-input"
           placeholder="Répétez le mot de passe"
           value={confirm}
           onChange={e => setConfirm(e.target.value)}
@@ -53,9 +53,9 @@ export default function AcceptForm({ token, email }: { token: string; email: str
           minLength={8}
         />
       </div>
-      {error && <div className="dash-error">{error}</div>}
-      <button type="submit" className="dash-btn" disabled={loading}>
-        {loading ? 'Création du compte…' : 'Créer mon compte'}
+      {error && <div className="auth-error" role="alert">{error}</div>}
+      <button type="submit" className="auth-btn" disabled={loading}>
+        {loading ? 'Création du compte…' : 'Créer mon compte →'}
       </button>
     </form>
   )

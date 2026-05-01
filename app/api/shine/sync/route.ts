@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
     const workspaceId = m.workspace_id
 
     const body = await request.json()
-    const accountId = body.accountId as number
-    if (!accountId) {
+    const accountId = Number(body.accountId)
+    if (!Number.isInteger(accountId) || accountId <= 0) {
       return NextResponse.json({ error: 'accountId requis' }, { status: 400 })
     }
 

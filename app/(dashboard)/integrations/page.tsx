@@ -84,7 +84,7 @@ function QontoSection() {
 
   useEffect(() => { load() }, [load])
 
-  if (loading) return <div className="dash-loading">Chargement...</div>
+  if (loading) return <div className="dash-loading">Chargement…</div>
   if (error) return <div className="dash-error">{error}</div>
 
   if (accounts.length === 0 && !showForm) {
@@ -92,7 +92,7 @@ function QontoSection() {
       <div className="dash-card" style={{ textAlign: 'center', padding: 48 }}>
         <div style={{ width: 48, height: 48, borderRadius: 2, background: '#ff5c35', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Special Elite,cursive', fontSize: 22, color: '#fff', fontWeight: 700, marginBottom: 16 }}>Q</div>
         <p style={{ fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)', fontSize: 14 }}>
-          Aucun compte Qonto configure.
+          Aucun compte Qonto configuré.
         </p>
         <button className="dash-btn" onClick={() => setShowForm(true)} style={{ marginTop: 16 }}>
           Ajouter un compte Qonto
@@ -179,8 +179,8 @@ function QontoForm({ account, onSaved, onCancel }: {
           <input type="text" className="dash-field-input" value={slug} onChange={e => setSlug(e.target.value)} required placeholder="mon-organisation" />
         </div>
         <div className="dash-field">
-          <label className="dash-field-label">Cle API</label>
-          <input type="password" className="dash-field-input" value={key} onChange={e => setKey(e.target.value)} required placeholder="Votre cle secrete Qonto" />
+          <label className="dash-field-label">Clé API</label>
+          <input type="password" className="dash-field-input" value={key} onChange={e => setKey(e.target.value)} required placeholder="Votre clé secrète Qonto" />
         </div>
         <div className="dash-field">
           <label className="dash-field-label">IBAN (optionnel)</label>
@@ -195,7 +195,7 @@ function QontoForm({ account, onSaved, onCancel }: {
 
         {bankAccounts && bankAccounts.length > 0 && (
           <div className="dash-section">
-            <div className="dash-section-title">Comptes bancaires detectes</div>
+            <div className="dash-section-title">Comptes bancaires détectés</div>
             <div className="dash-table-wrap">
               <table className="dash-table">
                 <thead><tr><th>Nom</th><th>IBAN</th><th className="right">Solde</th><th></th></tr></thead>
@@ -222,11 +222,11 @@ function QontoForm({ account, onSaved, onCancel }: {
           <button type="button" className="dash-btn-ghost" onClick={onCancel}>Annuler</button>
           {account?.id && (
             <button type="button" className="dash-btn-ghost" onClick={handleTest} disabled={testing}>
-              {testing ? 'Test en cours...' : 'Tester la connexion'}
+              {testing ? 'Test en cours…' : 'Tester la connexion'}
             </button>
           )}
           <button type="submit" className="dash-btn" disabled={saving}>
-            {saving ? 'Enregistrement...' : 'Enregistrer'}
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>
         </div>
       </form>
@@ -257,11 +257,11 @@ function QontoAccountCard({ account, onChanged }: { account: QontoAccountSafe; o
       if (!res.ok) {
         setError(data.error ?? 'Erreur de synchronisation')
       } else {
-        setSyncResult(`${data.imported} importee(s), ${data.skipped} ignoree(s)${data.errors ? ` — ${data.errors}` : ''}`)
+        setSyncResult(`${data.imported} importée(s), ${data.skipped} ignorée(s)${data.errors ? ` — ${data.errors}` : ''}`)
         onChanged()
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erreur reseau')
+      setError(e instanceof Error ? e.message : 'Erreur réseau')
     } finally {
       setSyncing(false)
     }
@@ -292,7 +292,7 @@ function QontoAccountCard({ account, onChanged }: { account: QontoAccountSafe; o
         <div style={{ flex: 1 }}>
           <div className="dash-card-title" style={{ margin: 0 }}>{account.name}</div>
           <div style={{ fontFamily: 'Courier Prime,monospace', fontSize: 12, color: 'var(--pencil)', marginTop: 4 }}>
-            Slug: {account.organization_slug} | Cle: {account.secret_key_masked}
+            Slug: {account.organization_slug} | Clé: {account.secret_key_masked}
             {account.iban && ` | IBAN: ${account.iban}`}
           </div>
         </div>
@@ -302,7 +302,7 @@ function QontoAccountCard({ account, onChanged }: { account: QontoAccountSafe; o
       </div>
 
       <div style={{ fontFamily: 'Courier Prime,monospace', fontSize: 12, color: 'var(--pencil)', marginBottom: 16 }}>
-        Derniere sync : {formatDate(account.last_sync_at)}
+        Dernière sync : {formatDate(account.last_sync_at)}
       </div>
 
       {error && <div className="dash-error" style={{ marginBottom: 12 }}>{error}</div>}
@@ -310,7 +310,7 @@ function QontoAccountCard({ account, onChanged }: { account: QontoAccountSafe; o
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <button className="dash-btn" onClick={handleSync} disabled={syncing}>
-          {syncing ? 'Synchronisation...' : 'Synchroniser maintenant'}
+          {syncing ? 'Synchronisation…' : 'Synchroniser maintenant'}
         </button>
         <button className="dash-btn-ghost" onClick={() => setEditing(true)}>Modifier</button>
         <button className="dash-btn-ghost" onClick={loadLogs}>Historique</button>
@@ -327,7 +327,7 @@ function QontoAccountCard({ account, onChanged }: { account: QontoAccountSafe; o
           ) : (
             <div className="dash-table-wrap">
               <table className="dash-table">
-                <thead><tr><th>Date</th><th className="right">Recues</th><th className="right">Importees</th><th className="right">Ignorees</th><th>Erreurs</th></tr></thead>
+                <thead><tr><th>Date</th><th className="right">Reçues</th><th className="right">Importées</th><th className="right">Ignorées</th><th>Erreurs</th></tr></thead>
                 <tbody>
                   {logs.map(l => (
                     <tr key={l.id}>
@@ -372,7 +372,7 @@ function ShineSection() {
 
   useEffect(() => { load() }, [load])
 
-  if (loading) return <div className="dash-loading">Chargement...</div>
+  if (loading) return <div className="dash-loading">Chargement…</div>
   if (error) return <div className="dash-error">{error}</div>
 
   if (accounts.length === 0 && !showForm) {
@@ -380,7 +380,7 @@ function ShineSection() {
       <div className="dash-card" style={{ textAlign: 'center', padding: 48 }}>
         <div style={{ width: 48, height: 48, borderRadius: 2, background: '#6c3fc5', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Special Elite,cursive', fontSize: 22, color: '#fff', fontWeight: 700, marginBottom: 16 }}>S</div>
         <p style={{ fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)', fontSize: 14 }}>
-          Aucun compte Shine configure.
+          Aucun compte Shine configuré.
         </p>
         <button className="dash-btn" onClick={() => setShowForm(true)} style={{ marginTop: 16 }}>
           Ajouter un compte Shine
@@ -463,7 +463,7 @@ function ShineForm({ account, onSaved, onCancel }: {
           <input type="text" className="dash-field-input" value={name} onChange={e => setName(e.target.value)} required />
         </div>
         <div className="dash-field">
-          <label className="dash-field-label">Token d&apos;acces</label>
+          <label className="dash-field-label">{"Token d'accès"}</label>
           <input type="password" className="dash-field-input" value={token} onChange={e => setToken(e.target.value)} required placeholder="Votre token Shine" />
         </div>
         <div className="dash-field">
@@ -483,7 +483,7 @@ function ShineForm({ account, onSaved, onCancel }: {
 
         {bankAccounts && bankAccounts.length > 0 && (
           <div className="dash-section">
-            <div className="dash-section-title">Comptes bancaires detectes</div>
+            <div className="dash-section-title">Comptes bancaires détectés</div>
             <div className="dash-table-wrap">
               <table className="dash-table">
                 <thead><tr><th>Nom</th><th>IBAN</th><th className="right">Solde</th><th></th></tr></thead>
@@ -510,11 +510,11 @@ function ShineForm({ account, onSaved, onCancel }: {
           <button type="button" className="dash-btn-ghost" onClick={onCancel}>Annuler</button>
           {account?.id && (
             <button type="button" className="dash-btn-ghost" onClick={handleTest} disabled={testing}>
-              {testing ? 'Test en cours...' : 'Tester la connexion'}
+              {testing ? 'Test en cours…' : 'Tester la connexion'}
             </button>
           )}
           <button type="submit" className="dash-btn" disabled={saving}>
-            {saving ? 'Enregistrement...' : 'Enregistrer'}
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>
         </div>
       </form>
@@ -543,11 +543,11 @@ function ShineAccountCard({ account, onChanged }: { account: ShineAccountSafe; o
       if (!res.ok) {
         setError(data.error ?? 'Erreur de synchronisation')
       } else {
-        setSyncResult(`${data.imported} importee(s), ${data.skipped} ignoree(s)${data.errors ? ` — ${data.errors}` : ''}`)
+        setSyncResult(`${data.imported} importée(s), ${data.skipped} ignorée(s)${data.errors ? ` — ${data.errors}` : ''}`)
         onChanged()
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erreur reseau')
+      setError(e instanceof Error ? e.message : 'Erreur réseau')
     } finally {
       setSyncing(false)
     }
@@ -583,7 +583,7 @@ function ShineAccountCard({ account, onChanged }: { account: ShineAccountSafe; o
       </div>
 
       <div style={{ fontFamily: 'Courier Prime,monospace', fontSize: 12, color: 'var(--pencil)', marginBottom: 16 }}>
-        Derniere sync : {formatDate(account.last_sync_at)}
+        Dernière sync : {formatDate(account.last_sync_at)}
       </div>
 
       {error && <div className="dash-error" style={{ marginBottom: 12 }}>{error}</div>}
@@ -591,7 +591,7 @@ function ShineAccountCard({ account, onChanged }: { account: ShineAccountSafe; o
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <button className="dash-btn" onClick={handleSync} disabled={syncing}>
-          {syncing ? 'Synchronisation...' : 'Synchroniser maintenant'}
+          {syncing ? 'Synchronisation…' : 'Synchroniser maintenant'}
         </button>
         <button className="dash-btn-ghost" onClick={() => setEditing(true)}>Modifier</button>
         <button className="dash-btn-danger" onClick={handleDelete} disabled={deleting}>

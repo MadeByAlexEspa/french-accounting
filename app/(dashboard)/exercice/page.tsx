@@ -427,7 +427,7 @@ export default function ExercicePage() {
 
       {!loading && (
         <>
-          <div className="dash-kpi-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+          <div className="dash-kpi-grid">
             <div className="dash-kpi-card">
               <p className="dash-kpi-label">Produits HT</p>
               <p className="dash-kpi-value">{formatEur(pnl.total_produits)}</p>

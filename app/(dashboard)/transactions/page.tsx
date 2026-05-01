@@ -78,7 +78,7 @@ function TvaSplitPanel({ row, onSave, onClose }: {
       <div className="dash-modal" onClick={e => e.stopPropagation()}>
         <div className="dash-modal-header">
           <h2 className="dash-modal-title">Ventiler la TVA</h2>
-          <button className="dash-modal-close" onClick={onClose}>×</button>
+          <button className="dash-modal-close" aria-label="Fermer" onClick={onClose}>×</button>
         </div>
         <div className="dash-modal-body">
           <p style={{ fontFamily: 'Courier Prime,monospace', fontSize: 13, color: 'var(--pencil)', marginBottom: 16 }}>
@@ -103,7 +103,7 @@ function TvaSplitPanel({ row, onSave, onClose }: {
                 TVA: {formatEur(line._tva)} · TTC: <strong>{formatEur(line._ttc)}</strong>
               </div>
               {lines.length > 1 && (
-                <button type="button" onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}
+                <button type="button" aria-label="Supprimer cette ligne" onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: 20, lineHeight: 1, paddingBottom: 8 }}>×</button>
               )}
             </div>
@@ -170,7 +170,7 @@ function FactureModal({ initial, factures, workspaceId, activiteType, onSaved, o
       <div className="dash-modal" onClick={e => e.stopPropagation()}>
         <div className="dash-modal-header">
           <h2 className="dash-modal-title">{initial ? 'Modifier l\'entrée' : 'Nouvelle entrée'}</h2>
-          <button className="dash-modal-close" onClick={onClose}>×</button>
+          <button className="dash-modal-close" aria-label="Fermer" onClick={onClose}>×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="dash-modal-body">
@@ -246,7 +246,7 @@ function DepenseModal({ initial, workspaceId, activiteType, onSaved, onClose }: 
       <div className="dash-modal" onClick={e => e.stopPropagation()}>
         <div className="dash-modal-header">
           <h2 className="dash-modal-title">{initial ? 'Modifier la sortie' : 'Nouvelle sortie'}</h2>
-          <button className="dash-modal-close" onClick={onClose}>×</button>
+          <button className="dash-modal-close" aria-label="Fermer" onClick={onClose}>×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="dash-modal-body">
@@ -1014,7 +1014,7 @@ export default function TransactionsPage() {
       {confirmDelete && (
         <div className="dash-modal-backdrop" onClick={() => setConfirmDelete(null)}>
           <div className="dash-modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-            <div className="dash-modal-header"><h2 className="dash-modal-title">Confirmer la suppression</h2><button className="dash-modal-close" onClick={() => setConfirmDelete(null)}>×</button></div>
+            <div className="dash-modal-header"><h2 className="dash-modal-title">Confirmer la suppression</h2><button className="dash-modal-close" aria-label="Fermer" onClick={() => setConfirmDelete(null)}>×</button></div>
             <div className="dash-modal-body">
               <p style={{ fontSize: 14 }}>Supprimer cette transaction ?</p>
               <p style={{ fontSize: 13, color: '#dc2626', marginTop: 8 }}>Cette action est irréversible.</p>
@@ -1030,7 +1030,7 @@ export default function TransactionsPage() {
       {pendingCat && (
         <div className="dash-modal-backdrop" onClick={() => applyPropagation(false)}>
           <div className="dash-modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
-            <div className="dash-modal-header"><h2 className="dash-modal-title">Appliquer à toutes les transactions ?</h2><button className="dash-modal-close" onClick={() => applyPropagation(false)}>×</button></div>
+            <div className="dash-modal-header"><h2 className="dash-modal-title">Appliquer à toutes les transactions ?</h2><button className="dash-modal-close" aria-label="Fermer" onClick={() => applyPropagation(false)}>×</button></div>
             <div className="dash-modal-body">
               <p style={{ fontSize: 14 }}>Vous changez la catégorie en <strong>{pendingCat.newCategory}</strong>.</p>
               <p style={{ fontSize: 13, color: 'var(--pencil)', marginTop: 8 }}>
@@ -1057,7 +1057,7 @@ export default function TransactionsPage() {
       {confirmBulkDelete && (
         <div className="dash-modal-backdrop" onClick={() => setConfirmBulkDelete(false)}>
           <div className="dash-modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-            <div className="dash-modal-header"><h2 className="dash-modal-title">Suppression en masse</h2><button className="dash-modal-close" onClick={() => setConfirmBulkDelete(false)}>×</button></div>
+            <div className="dash-modal-header"><h2 className="dash-modal-title">Suppression en masse</h2><button className="dash-modal-close" aria-label="Fermer" onClick={() => setConfirmBulkDelete(false)}>×</button></div>
             <div className="dash-modal-body">
               <p style={{ fontSize: 14 }}>Supprimer <strong>{selectedIds.size} transaction{selectedIds.size > 1 ? 's' : ''}</strong> ?</p>
               <p style={{ fontSize: 13, color: '#dc2626', marginTop: 8 }}>Cette action est irréversible.</p>
