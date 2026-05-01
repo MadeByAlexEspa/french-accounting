@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { Workspace, Membership } from '@/lib/types/database'
+import type { Workspace } from '@/lib/types/database'
+import { createInvitation, listInvitations, cancelInvitation, type InvitationRow } from './actions'
 
 const ACTIVITE_OPTIONS = [
   { value: '',             label: '— Non renseigné —' },
@@ -170,23 +171,144 @@ function ProfileSection({ ws, onSaved }: { ws: WorkspaceData; onSaved: () => voi
 function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
   members: WorkspaceData['members']; workspaceId: string; currentUserId: string; onChanged: () => void
 }) {
+  const [invitations, setInvitations]   = useState<InvitationRow[]>([])
+  const [showInviteForm, setShowInviteForm] = useState(false)
+  const [inviteEmail, setInviteEmail]   = useState('')
+  const [inviting, setInviting]         = useState(false)
+  const [inviteError, setInviteError]   = useState<string|null>(null)
+  const [generatedUrl, setGeneratedUrl] = useState<string|null>(null)
+  const [copied, setCopied]             = useState(false)
+
+  const loadInvitations = useCallback(async () => {
+    const res = await listInvitations()
+    if (res.data) setInvitations(res.data)
+  }, [])
+
+  useEffect(() => { loadInvitations() }, [loadInvitations])
+
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault()
+    setInviting(true); setInviteError(null); setGeneratedUrl(null)
+    const res = await createInvitation(inviteEmail)
+    setInviting(false)
+    if (res.error) { setInviteError(res.error); return }
+    setGeneratedUrl(res.inviteUrl ?? null)
+    setInviteEmail('')
+    loadInvitations()
+  }
+
+  async function handleCopy(url: string) {
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handleCancel(id: string) {
+    const res = await cancelInvitation(id)
+    if (!res.error) loadInvitations()
+  }
+
+  function inviteStatus(inv: InvitationRow): { label: string; cls: string } {
+    if (inv.used_at) return { label: 'Acceptée', cls: 'dash-badge-green' }
+    if (new Date(inv.expires_at) < new Date()) return { label: 'Expirée', cls: 'dash-badge-red' }
+    return { label: 'En attente', cls: 'dash-badge-blue' }
+  }
+
+  const pendingCount = invitations.filter(i => !i.used_at && new Date(i.expires_at) >= new Date()).length
+
   return (
-    <div className="dash-card">
-      <div className="dash-card-title">Membres ({members.length})</div>
-      <div className="dash-table-wrap"><table className="dash-table">
-        <thead><tr><th>User ID</th><th>Rôle</th><th>Membre depuis</th><th></th></tr></thead>
-        <tbody>
-          {members.length === 0 && <tr><td colSpan={4} className="dash-empty">Aucun membre.</td></tr>}
-          {members.map(m=>(
-            <tr key={m.id}>
-              <td style={{ fontFamily:'Courier Prime,monospace', fontSize:12 }}>{m.user_id.slice(0,8)}…{m.user_id === currentUserId ? ' (vous)' : ''}</td>
-              <td><span className={`dash-badge ${m.role==='owner'||m.role==='admin'?'dash-badge-blue':'dash-badge-gray'}`}>{m.role}</span></td>
-              <td style={{ fontSize:12, color:'var(--pencil)' }}>{new Date(m.created_at).toLocaleDateString('fr-FR')}</td>
-              <td></td>
-            </tr>
-          ))}
-        </tbody>
-      </table></div>
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+      {/* Members table */}
+      <div className="dash-card">
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+          <div className="dash-card-title" style={{ margin:0 }}>Membres ({members.length})</div>
+          <button className="dash-btn" onClick={() => { setShowInviteForm(v=>!v); setGeneratedUrl(null); setInviteError(null) }}>
+            + Inviter un membre
+          </button>
+        </div>
+
+        {showInviteForm && (
+          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:6, padding:16, marginBottom:16 }}>
+            <form onSubmit={handleInvite} style={{ display:'flex', gap:10, alignItems:'flex-end', flexWrap:'wrap' }}>
+              <div className="dash-field" style={{ flex:1, minWidth:220, margin:0 }}>
+                <label className="dash-field-label">Adresse email</label>
+                <input
+                  type="email" className="dash-field-input"
+                  placeholder="collegue@exemple.com"
+                  value={inviteEmail}
+                  onChange={e => { setInviteEmail(e.target.value); setInviteError(null); setGeneratedUrl(null) }}
+                  required autoFocus
+                />
+              </div>
+              <button type="submit" className="dash-btn" disabled={inviting}>
+                {inviting ? 'Envoi…' : 'Envoyer l\'invitation'}
+              </button>
+            </form>
+            {inviteError && <div className="dash-error" style={{ marginTop:10 }}>{inviteError}</div>}
+            {generatedUrl && (
+              <div style={{ marginTop:12, padding:12, background:'var(--bg)', borderRadius:4, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                <span style={{ fontSize:12, color:'var(--pencil)', fontFamily:'Courier Prime,monospace', wordBreak:'break-all', flex:1 }}>
+                  {generatedUrl}
+                </span>
+                <button className="dash-btn" style={{ flexShrink:0 }} onClick={() => handleCopy(generatedUrl)}>
+                  {copied ? '✓ Copié' : 'Copier'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="dash-table-wrap"><table className="dash-table">
+          <thead><tr><th>User ID</th><th>Rôle</th><th>Membre depuis</th><th></th></tr></thead>
+          <tbody>
+            {members.length === 0 && <tr><td colSpan={4} className="dash-empty">Aucun membre.</td></tr>}
+            {members.map(m=>(
+              <tr key={m.id}>
+                <td style={{ fontFamily:'Courier Prime,monospace', fontSize:12 }}>{m.user_id.slice(0,8)}…{m.user_id === currentUserId ? ' (vous)' : ''}</td>
+                <td><span className={`dash-badge ${m.role==='owner'||m.role==='admin'?'dash-badge-blue':'dash-badge-gray'}`}>{m.role}</span></td>
+                <td style={{ fontSize:12, color:'var(--pencil)' }}>{new Date(m.created_at).toLocaleDateString('fr-FR')}</td>
+                <td></td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+      </div>
+
+      {/* Invitations table */}
+      {invitations.length > 0 && (
+        <div className="dash-card">
+          <div className="dash-card-title">Invitations ({pendingCount} en attente)</div>
+          <div className="dash-table-wrap"><table className="dash-table">
+            <thead><tr><th>Email</th><th>Statut</th><th>Expire le</th><th></th></tr></thead>
+            <tbody>
+              {invitations.map(inv => {
+                const st = inviteStatus(inv)
+                const isPending = !inv.used_at && new Date(inv.expires_at) >= new Date()
+                return (
+                  <tr key={inv.id}>
+                    <td>{inv.email}</td>
+                    <td><span className={`dash-badge ${st.cls}`}>{st.label}</span></td>
+                    <td style={{ fontSize:12, color:'var(--pencil)' }}>
+                      {new Date(inv.expires_at).toLocaleString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
+                    </td>
+                    <td>
+                      {isPending && (
+                        <button
+                          className="dash-btn-ghost"
+                          style={{ fontSize:12, padding:'4px 10px' }}
+                          onClick={() => handleCancel(inv.id)}
+                        >
+                          Annuler
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table></div>
+        </div>
+      )}
     </div>
   )
 }

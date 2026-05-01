@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isPublic = PUBLIC_ROUTES.has(pathname)
+  const isPublic = PUBLIC_ROUTES.has(pathname) || pathname.startsWith('/invite/')
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register') ||
     pathname.startsWith('/mot-de-passe-oublie') || pathname.startsWith('/reset-password')
 

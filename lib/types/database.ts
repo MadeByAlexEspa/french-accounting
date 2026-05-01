@@ -67,6 +67,42 @@ export interface Database {
           },
         ]
       }
+      invitations: {
+        Row: {
+          id: string
+          workspace_id: string
+          email: string
+          role: 'owner' | 'admin' | 'member'
+          token: string
+          invited_by: string
+          expires_at: string
+          used_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          email: string
+          role?: 'owner' | 'admin' | 'member'
+          token: string
+          invited_by: string
+          expires_at: string
+          used_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          email?: string
+          role?: 'owner' | 'admin' | 'member'
+          token?: string
+          invited_by?: string
+          expires_at?: string
+          used_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       factures: {
         Row: {
           id: number
@@ -384,6 +420,8 @@ export type Workspace  = Database['public']['Tables']['workspaces']['Row']
 export type Membership = Database['public']['Tables']['memberships']['Row']
 export type Facture    = Database['public']['Tables']['factures']['Row']
 export type Depense    = Database['public']['Tables']['depenses']['Row']
+
+export type Invitation     = Database['public']['Tables']['invitations']['Row']
 
 export type QontoAccount   = Database['public']['Tables']['qonto_accounts']['Row']
 export type QontoImport    = Database['public']['Tables']['qonto_imports']['Row']

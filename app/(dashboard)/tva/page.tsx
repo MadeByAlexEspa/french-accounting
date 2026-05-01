@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Facture, Depense } from '@/lib/types/database'
+import { isTvaErronnee, getTvaAlertLabel } from '@/lib/tva-validation'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -549,10 +550,19 @@ export default function TVAPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {ff.map(f => (
-                      <tr key={f.id}>
+                    {ff.map(f => {
+                      const erreur = isTvaErronnee(f)
+                      return (
+                      <tr key={f.id} style={erreur ? { background: 'rgba(239,68,68,0.06)' } : undefined}>
                         <td>{f.date}</td>
-                        <td>{f.client}</td>
+                        <td>
+                          {f.client}
+                          {erreur && (
+                            <span title={getTvaAlertLabel(f)} style={{ marginLeft: 6, color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'default' }}>
+                              ⚠ {getTvaAlertLabel(f)}
+                            </span>
+                          )}
+                        </td>
                         <td className="right">{formatEur(f.montant_ht)}</td>
                         <td className="center">
                           <TauxCell row={f} onSave={handleCellSave} onSplitClick={() => setSplitTarget(f)} />
@@ -567,7 +577,8 @@ export default function TVAPage() {
                           {f.bank_source ? (f.has_attachment ? '📎' : '—') : null}
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                   <tfoot><tr>
                     <td colSpan={2}><strong>Total</strong></td>
@@ -608,10 +619,19 @@ export default function TVAPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {fd.map(d => (
-                      <tr key={d.id}>
+                    {fd.map(d => {
+                      const erreur = isTvaErronnee(d)
+                      return (
+                      <tr key={d.id} style={erreur ? { background: 'rgba(239,68,68,0.06)' } : undefined}>
                         <td>{d.date}</td>
-                        <td>{d.fournisseur}</td>
+                        <td>
+                          {d.fournisseur}
+                          {erreur && (
+                            <span title={getTvaAlertLabel(d)} style={{ marginLeft: 6, color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'default' }}>
+                              ⚠ {getTvaAlertLabel(d)}
+                            </span>
+                          )}
+                        </td>
                         <td className="right">{formatEur(d.montant_ht)}</td>
                         <td className="center">
                           <TauxCell row={d} onSave={handleCellSave} onSplitClick={() => setSplitTarget(d)} />
@@ -626,7 +646,8 @@ export default function TVAPage() {
                           {d.bank_source ? (d.has_attachment ? '📎' : '—') : null}
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                   <tfoot><tr>
                     <td colSpan={2}><strong>Total</strong></td>
