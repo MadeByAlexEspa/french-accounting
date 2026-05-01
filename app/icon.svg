@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Shadow (mimics the 3px 3px 0 box-shadow of the app) -->
+  <rect x="5" y="5" width="26" height="26" rx="3" fill="#1a1a1a"/>
+  <!-- Paper background with ink border -->
+  <rect x="2" y="2" width="26" height="26" rx="3" fill="#fafaf8" stroke="#1a1a1a" stroke-width="1.5"/>
+  <!-- CP monogram — Courier/typewriter style -->
+  <text
+    x="15" y="21"
+    text-anchor="middle"
+    font-family="Courier New, Courier, monospace"
+    font-size="13"
+    font-weight="700"
+    fill="#1a1a1a"
+    letter-spacing="-0.5"
+  >CP</text>
+</svg>
