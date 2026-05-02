@@ -62,7 +62,8 @@ export default function ResetPasswordPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="auth-input"
-                placeholder="6 caractères minimum"
+                placeholder="8 caractères minimum"
+                minLength={8}
               />
             </div>
 

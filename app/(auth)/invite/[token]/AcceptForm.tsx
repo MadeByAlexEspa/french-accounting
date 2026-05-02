@@ -17,9 +17,13 @@ export default function AcceptForm({ token, email }: { token: string; email: str
     if (password !== confirm) { setError('Les mots de passe ne correspondent pas.'); return }
     setLoading(true)
     const result = await acceptInvitation(token, password)
+    if (result.error) { setError(result.error); setLoading(false); return }
+    // Auto sign-in so the user lands directly in the app
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
-    if (result.error) { setError(result.error); return }
-    router.push('/login?invited=1')
+    router.push(signInError ? '/login?invited=1' : '/transactions')
   }
 
   return (

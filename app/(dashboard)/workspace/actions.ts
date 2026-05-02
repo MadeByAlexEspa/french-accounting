@@ -1,8 +1,16 @@
 'use server'
 
 import { randomBytes } from 'crypto'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { sendInvitationEmail } from '@/lib/email'
+
+export type MemberRow = {
+  id: string
+  user_id: string
+  role: string
+  email: string
+  created_at: string
+}
 
 export type InvitationRow = {
   id: string
@@ -164,4 +172,35 @@ export async function resendInvitation(id: string): Promise<{ error?: string; in
   sendInvitationEmail(inv.email, wsName, inviteUrl).catch(() => {})
 
   return { inviteUrl }
+}
+
+export async function listMembersWithEmail(): Promise<{ data?: MemberRow[]; error?: string }> {
+  const ctx = await getWorkspaceCtx()
+  if (!ctx) return { error: 'Session expirée.' }
+
+  const supabase = await createClient()
+  const service = createServiceClient()
+
+  const { data: members, error } = await supabase
+    .from('memberships')
+    .select('id, user_id, role, created_at')
+    .eq('workspace_id', ctx.workspaceId)
+    .order('created_at', { ascending: true })
+
+  if (error || !members) return { error: error?.message ?? 'Erreur.' }
+
+  const emailMap: Record<string, string> = {}
+  await Promise.all(
+    members.map(async (m) => {
+      const { data } = await service.auth.admin.getUserById(m.user_id)
+      if (data.user?.email) emailMap[m.user_id] = data.user.email
+    })
+  )
+
+  return {
+    data: members.map(m => ({
+      ...m,
+      email: emailMap[m.user_id] ?? '—',
+    })),
+  }
 }

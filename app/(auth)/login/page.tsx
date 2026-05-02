@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const invited = searchParams.get('invited') === '1'
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState<string | null>(null)
@@ -63,6 +65,12 @@ export default function LoginPage() {
       {/* ── Right — form ── */}
       <div className="auth-right">
         <div className="auth-form-wrap">
+
+          {invited && (
+            <div className="auth-success" style={{ marginBottom: 16 }}>
+              Votre compte a été créé. Connectez-vous pour accéder à votre espace.
+            </div>
+          )}
 
           <div className="auth-form-header">
             <h2 className="auth-form-title">Se connecter</h2>

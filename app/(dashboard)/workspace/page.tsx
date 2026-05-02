@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Workspace } from '@/lib/types/database'
-import { createInvitation, listInvitations, cancelInvitation, resendInvitation, type InvitationRow } from './actions'
+import { createInvitation, listInvitations, cancelInvitation, resendInvitation, listMembersWithEmail, type InvitationRow, type MemberRow } from './actions'
 
 const ACTIVITE_OPTIONS = [
   { value: '',             label: '— Non renseigné —' },
@@ -30,7 +30,7 @@ const STRUCTURE_OPTIONS = [
 type Tab = 'general' | 'membres'
 
 interface WorkspaceData extends Workspace {
-  members: Array<{ id: string; user_id: string; role: string; email?: string; created_at: string }>
+  members: MemberRow[]
 }
 
 export default function WorkspacePage() {
@@ -51,7 +51,7 @@ export default function WorkspacePage() {
       if (!m) { setError('Workspace introuvable.'); return }
       const { data: workspace, error: we } = await supabase.from('workspaces').select('*').eq('id', m.workspace_id).single()
       if (we || !workspace) { setError(we?.message ?? 'Erreur'); return }
-      const { data: members } = await supabase.from('memberships').select('id, user_id, role, created_at').eq('workspace_id', m.workspace_id)
+      const { data: members } = await listMembersWithEmail()
       setWs({ ...workspace, members: members ?? [] } as WorkspaceData)
     } finally {
       setLoading(false)
@@ -195,6 +195,7 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
   const [resendingId, setResendingId]     = useState<string|null>(null)
   const [resendError, setResendError]     = useState<string|null>(null)
   const [resendSuccess, setResendSuccess] = useState<string|null>(null)
+  const [resendUrl, setResendUrl]       = useState<string|null>(null)
 
   const loadInvitations = useCallback(async () => {
     const res = await listInvitations()
@@ -227,12 +228,13 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
   }
 
   async function handleResend(id: string) {
-    setResendingId(id); setResendError(null); setResendSuccess(null)
+    setResendingId(id); setResendError(null); setResendSuccess(null); setResendUrl(null)
     const res = await resendInvitation(id)
     setResendingId(null)
     if (res.error) { setResendError(res.error); return }
     setResendSuccess('Invitation renvoyée.')
-    setTimeout(() => setResendSuccess(null), 3000)
+    if (res.inviteUrl) setResendUrl(res.inviteUrl)
+    setTimeout(() => { setResendSuccess(null); setResendUrl(null) }, 8000)
     loadInvitations()
   }
 
@@ -287,12 +289,12 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
         )}
 
         <div className="dash-table-wrap"><table className="dash-table">
-          <thead><tr><th>User ID</th><th>Rôle</th><th>Membre depuis</th><th></th></tr></thead>
+          <thead><tr><th>Email</th><th>Rôle</th><th>Membre depuis</th><th></th></tr></thead>
           <tbody>
             {members.length === 0 && <tr><td colSpan={4} className="dash-empty">Aucun membre.</td></tr>}
             {members.map(m=>(
               <tr key={m.id}>
-                <td style={{ fontFamily:'Courier Prime,monospace', fontSize:12 }}>{m.user_id.slice(0,8)}…{m.user_id === currentUserId ? ' (vous)' : ''}</td>
+                <td style={{ fontSize:13 }}>{m.email}{m.user_id === currentUserId ? ' (vous)' : ''}</td>
                 <td><span className={`dash-badge ${m.role==='owner'||m.role==='admin'?'dash-badge-blue':'dash-badge-gray'}`}>{m.role}</span></td>
                 <td style={{ fontSize:12, color:'var(--pencil)' }}>{new Date(m.created_at).toLocaleDateString('fr-FR')}</td>
                 <td></td>
@@ -308,7 +310,25 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
           Invitations{invitations.length > 0 ? ` — ${pendingCount} en attente` : ''}
         </div>
         {resendError   && <div className="dash-error"       role="alert" style={{ marginBottom:12 }}>{resendError}</div>}
-        {resendSuccess && <div className="dash-success-msg" role="status" style={{ marginBottom:12 }}>{resendSuccess}</div>}
+        {resendSuccess && (
+          <div className="dash-success-msg" role="status" style={{ marginBottom:12 }}>
+            {resendSuccess}
+            {resendUrl && (
+              <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:8, flexWrap:'wrap' }}>
+                <span style={{ fontFamily:'Courier Prime,monospace', fontSize:11, color:'var(--pencil)', wordBreak:'break-all', flex:1 }}>
+                  {resendUrl}
+                </span>
+                <button
+                  className="dash-btn-ghost"
+                  style={{ fontSize:11, padding:'2px 8px', flexShrink:0 }}
+                  onClick={() => handleCopy(resendUrl, 'resend')}
+                >
+                  {copiedId === 'resend' ? '✓ Copié' : 'Copier'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {invitations.length === 0 ? (
           <div className="dash-empty" style={{ padding:'16px 0' }}>Aucune invitation envoyée.</div>
