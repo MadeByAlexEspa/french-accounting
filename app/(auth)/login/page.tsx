@@ -1,14 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+function InvitedBanner() {
+  const searchParams = useSearchParams()
+  if (searchParams.get('invited') !== '1') return null
+  return (
+    <div className="auth-success" style={{ marginBottom: 16 }}>
+      Votre compte a été créé. Connectez-vous pour accéder à votre espace.
+    </div>
+  )
+}
+
 export default function LoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const invited = searchParams.get('invited') === '1'
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState<string | null>(null)
@@ -66,11 +74,9 @@ export default function LoginPage() {
       <div className="auth-right">
         <div className="auth-form-wrap">
 
-          {invited && (
-            <div className="auth-success" style={{ marginBottom: 16 }}>
-              Votre compte a été créé. Connectez-vous pour accéder à votre espace.
-            </div>
-          )}
+          <Suspense>
+            <InvitedBanner />
+          </Suspense>
 
           <div className="auth-form-header">
             <h2 className="auth-form-title">Se connecter</h2>
