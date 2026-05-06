@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Workspace } from '@/lib/types/database'
 
 const NAV_MAIN = [
-  { href: '/',               label: 'Accueil' },
+  { href: '/dashboard',      label: 'Accueil' },
   { href: '/transactions',   label: 'Transactions' },
   { href: '/tva',            label: 'TVA' },
   { href: '/exercice',       label: 'Comptes annuels' },

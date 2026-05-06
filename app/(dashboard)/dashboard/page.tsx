@@ -46,7 +46,7 @@ export default async function DashboardHome() {
   const charges  = round2(d.reduce((s, r) => s + r.montant_ht, 0))
   const resultat = round2(ca - charges)
 
-  const tvaCollectee  = round2(f.reduce((s, r) => {
+  const tvaCollectee = round2(f.reduce((s, r) => {
     if (r.taux_tva === -1 && r.tva_lines) {
       try {
         const lines = (typeof r.tva_lines === 'string' ? JSON.parse(r.tva_lines) : r.tva_lines) as { montant_tva: number }[]
@@ -58,8 +58,8 @@ export default async function DashboardHome() {
   const tvaDeductible = round2(d.reduce((s, r) => s + r.montant_tva, 0))
   const tvaDue        = round2(tvaCollectee - tvaDeductible)
 
-  const impayeesRows  = f.filter(r => r.statut === 'en_attente')
-  const impayees      = round2(impayeesRows.reduce((s, r) => s + r.montant_ttc, 0))
+  const impayeesRows = f.filter(r => r.statut === 'en_attente')
+  const impayees     = round2(impayeesRows.reduce((s, r) => s + r.montant_ttc, 0))
 
   return (
     <div className="dash-page">
@@ -68,7 +68,7 @@ export default async function DashboardHome() {
           <h1 className="dash-title">Vue d'ensemble</h1>
           <p className="dash-subtitle">Exercice {year} — données en temps réel</p>
         </div>
-        <Link href="/transactions?tab=entrees" className="dash-btn">+ Nouvelle entrée</Link>
+        <Link href="/transactions" className="dash-btn">+ Nouvelle entrée</Link>
       </div>
 
       {/* Row 1 — P&L */}
