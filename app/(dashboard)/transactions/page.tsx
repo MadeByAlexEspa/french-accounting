@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import type { Facture, Depense } from '@/lib/types/database'
 import { getCatEntreesGroups, getCatSortiesGroups, type CatGroup } from '@/lib/categories'
+import { sendInvoiceEmail } from './actions'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -656,6 +657,10 @@ export default function TransactionsPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [pendingCat, setPendingCat] = useState<PendingCat | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [emailTarget, setEmailTarget] = useState<{ id: number; client: string } | null>(null)
+  const [emailInput, setEmailInput] = useState('')
+  const [emailSending, setEmailSending] = useState(false)
+  const [emailResult, setEmailResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -802,6 +807,15 @@ export default function TransactionsPage() {
     await load()
   }
 
+  async function handleSendEmail() {
+    if (!emailTarget || !emailInput) return
+    setEmailSending(true); setEmailResult(null)
+    const res = await sendInvoiceEmail(emailTarget.id, emailInput)
+    setEmailSending(false)
+    setEmailResult({ ok: res.ok, msg: res.ok ? 'Email envoyé avec succès.' : `Erreur : ${res.error ?? 'inconnue'}` })
+    if (res.ok) setTimeout(() => setEmailTarget(null), 1500)
+  }
+
   async function applyPropagation(all: boolean) {
     if (!pendingCat) return
     const { matchingRows, newCategory, isEntree } = pendingCat
@@ -894,6 +908,12 @@ export default function TransactionsPage() {
             <button className="dash-btn-ghost" style={{ padding: '3px 8px', fontSize: 11 }}
               onClick={() => window.open(`/transactions/imprimer/${row.id}`, '_blank')}>
               PDF
+            </button>
+          )}{' '}
+          {isEntree && (
+            <button className="dash-btn-ghost" style={{ padding: '3px 8px', fontSize: 11 }}
+              onClick={() => { setEmailTarget({ id: row.id, client: (row as Facture & { _type: 'entree'; _key: string }).client }); setEmailInput(''); setEmailResult(null) }}>
+              ✉
             </button>
           )}{' '}
           <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: 11, fontFamily: 'Courier Prime,monospace' }}
@@ -1135,6 +1155,46 @@ export default function TransactionsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Email modal */}
+      {emailTarget && typeof document !== 'undefined' && createPortal(
+        <div className="dash-modal-overlay" onClick={() => setEmailTarget(null)}>
+          <div className="dash-modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            <div className="dash-modal-header">
+              <h3 className="dash-modal-title">Envoyer la facture</h3>
+              <button className="dash-modal-close" onClick={() => setEmailTarget(null)}>✕</button>
+            </div>
+            <div style={{ padding: '16px 20px' }}>
+              <p style={{ fontSize: 13, color: 'var(--pencil)', marginBottom: 16 }}>
+                Destinataire pour <strong>{emailTarget.client}</strong>
+              </p>
+              <input
+                type="email"
+                className="dash-input"
+                placeholder="email@client.fr"
+                value={emailInput}
+                onChange={e => setEmailInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSendEmail() }}
+                disabled={emailSending}
+                autoFocus
+                style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12 }}
+              />
+              {emailResult && (
+                <p style={{ fontSize: 12, color: emailResult.ok ? '#16a34a' : '#dc2626', marginBottom: 12 }}>
+                  {emailResult.msg}
+                </p>
+              )}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="dash-btn-ghost" onClick={() => setEmailTarget(null)} disabled={emailSending}>Annuler</button>
+                <button className="dash-btn" onClick={handleSendEmail} disabled={emailSending || !emailInput}>
+                  {emailSending ? 'Envoi…' : 'Envoyer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   )

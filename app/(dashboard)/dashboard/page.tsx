@@ -61,6 +61,22 @@ export default async function DashboardHome() {
   const impayeesRows = f.filter(r => r.statut === 'en_attente')
   const impayees     = round2(impayeesRows.reduce((s, r) => s + r.montant_ttc, 0))
 
+  // Alert: overdue invoices (en_attente + date > 30 days ago)
+  const today = new Date()
+  const thirtyDaysAgo = new Date(today); thirtyDaysAgo.setDate(today.getDate() - 30)
+  const overdueRows = f.filter(r =>
+    r.statut === 'en_attente' && r.date < thirtyDaysAgo.toISOString().slice(0, 10)
+  )
+  const overdueTotal = round2(overdueRows.reduce((s, r) => s + r.montant_ttc, 0))
+
+  // Alert: TVA declaration deadline (within 15 days of end of quarter)
+  const m0 = today.getMonth() // 0-based
+  const currentQuarter = Math.floor(m0 / 3) // 0-3
+  const quarterEndMonth = (currentQuarter + 1) * 3 // 3, 6, 9, 12
+  const quarterEndDate = new Date(year, quarterEndMonth, 0) // last day of quarter
+  const daysToQuarterEnd = Math.ceil((quarterEndDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  const showTvaAlert = daysToQuarterEnd >= 0 && daysToQuarterEnd <= 15
+
   const MONTHS = ['Jan','Fév','Mar','Avr','Mai','Jui','Jul','Aoû','Sep','Oct','Nov','Déc']
   const monthlyCA = Array(12).fill(0)
   const monthlyCharges = Array(12).fill(0)
@@ -77,6 +93,39 @@ export default async function DashboardHome() {
         </div>
         <Link href="/transactions" className="dash-btn">+ Nouvelle entrée</Link>
       </div>
+
+      {/* Alerts */}
+      {overdueRows.length > 0 && (
+        <div className="dash-alert dash-alert-danger">
+          <span className="dash-alert-glyph">!</span>
+          <div className="dash-alert-body">
+            <p className="dash-alert-title">
+              {overdueRows.length} facture{overdueRows.length > 1 ? 's' : ''} en retard de paiement
+            </p>
+            <p className="dash-alert-desc">
+              {fmt(overdueTotal)} TTC impayé{overdueRows.length > 1 ? 's' : ''} depuis plus de 30 jours — relancez vos clients.
+            </p>
+          </div>
+          <Link href="/transactions?tab=entrees" className="dash-alert-action">
+            Voir →
+          </Link>
+        </div>
+      )}
+
+      {showTvaAlert && (
+        <div className="dash-alert dash-alert-warning">
+          <span className="dash-alert-glyph">%</span>
+          <div className="dash-alert-body">
+            <p className="dash-alert-title">Déclaration TVA à préparer</p>
+            <p className="dash-alert-desc">
+              Fin de trimestre dans {daysToQuarterEnd} jour{daysToQuarterEnd > 1 ? 's' : ''} — vérifiez votre TVA collectée et déductible.
+            </p>
+          </div>
+          <Link href="/tva" className="dash-alert-action">
+            Déclarer →
+          </Link>
+        </div>
+      )}
 
       {/* Row 1 — P&L */}
       <div className="dash-kpi-grid">

@@ -1459,3 +1459,18 @@ body {
   .print-invoice { border: none; margin: 0; padding: 24px; max-width: 100%; box-shadow: none; }
   body { background: white; }
 }
+
+/* ── Dashboard Alerts ── */
+.dash-alert {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 14px 18px; margin-top: 8px;
+  border: 1.5px solid var(--ink); border-left-width: 4px;
+  background: var(--paper);
+}
+.dash-alert-danger { border-left-color: #dc2626; }
+.dash-alert-warning { border-left-color: #d97706; }
+.dash-alert-glyph { font-family: 'Courier Prime', monospace; font-size: 20px; flex-shrink: 0; line-height: 1.2; }
+.dash-alert-body { flex: 1; }
+.dash-alert-title { font-family: 'Special Elite', cursive; font-size: 15px; color: var(--ink); margin: 0 0 2px; }
+.dash-alert-desc { font-size: 12px; color: var(--pencil); margin: 0; line-height: 1.5; }
+.dash-alert-action { font-family: 'Courier Prime', monospace; font-size: 11px; color: var(--ink); text-decoration: underline; white-space: nowrap; align-self: center; }
