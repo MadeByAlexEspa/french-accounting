@@ -791,6 +791,40 @@ export default function TransactionsPage() {
     setConfirmDelete(null); await load()
   }
 
+  function exportCsv() {
+    const BOM = '﻿'
+    const headers = ['Date', 'Type', 'Tiers', 'Description', 'HT (€)', 'TVA (€)', 'TTC (€)', 'Catégorie', 'Statut', 'Numéro']
+    const rows = filtered.map(row => {
+      const isEntree = row._type === 'entree'
+      const tiers = isEntree
+        ? (row as Facture & { _type: 'entree'; _key: string }).client
+        : (row as Depense & { _type: 'sortie'; _key: string }).fournisseur
+      const numero = isEntree ? (row as Facture & { _type: 'entree'; _key: string }).numero : ''
+      const statut = row.statut === 'payee' ? 'Payée' : 'En attente'
+      const type = isEntree ? 'Entrée' : 'Sortie'
+      function csvNum(n: number) { return n.toFixed(2).replace('.', ',') }
+      function csvStr(s: string | null | undefined) {
+        const v = s ?? ''
+        return v.includes(';') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v
+      }
+      return [
+        row.date, type, csvStr(tiers), csvStr(row.description),
+        csvNum(row.montant_ht), csvNum(row.montant_tva), csvNum(row.montant_ttc),
+        csvStr(row.categorie), statut, csvStr(numero),
+      ].join(';')
+    })
+    const csv = BOM + [headers.join(';'), ...rows].join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   async function handleBulkDelete() {
     setBulkDeleting(true); setActionError(null)
     const supabase = createClient()
@@ -935,14 +969,19 @@ export default function TransactionsPage() {
           <h1 className="dash-title">Transactions</h1>
           <p className="dash-subtitle">{factures.length} entrée{factures.length !== 1 ? 's' : ''} · {depenses.length} sortie{depenses.length !== 1 ? 's' : ''}</p>
         </div>
-        {tab !== 'tous' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button className="dash-btn" onClick={() => { setEditFact(null); setEditDep(null); setShowForm(true); setActionError(null) }}>
-              {isEntrees ? '+ Nouvelle entrée' : '+ Nouvelle sortie'}
-            </button>
-            <span className="dash-kbd" title="Raccourci clavier">n</span>
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button className="dash-btn-ghost" onClick={exportCsv} disabled={filtered.length === 0} title={`Exporter ${filtered.length} ligne(s) en CSV`}>
+            ↓ CSV {filtered.length > 0 && `(${filtered.length})`}
+          </button>
+          {tab !== 'tous' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button className="dash-btn" onClick={() => { setEditFact(null); setEditDep(null); setShowForm(true); setActionError(null) }}>
+                {isEntrees ? '+ Nouvelle entrée' : '+ Nouvelle sortie'}
+              </button>
+              <span className="dash-kbd" title="Raccourci clavier">n</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="dash-tabs">

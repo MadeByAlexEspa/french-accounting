@@ -8,7 +8,36 @@ function fmt(n: number) {
 
 function round2(n: number) { return Math.round(n * 100) / 100 }
 
-export default async function DashboardHome() {
+function YearNav({ year, currentYear }: { year: number; currentYear: number }) {
+  const prevYear = year - 1
+  const nextYear = year + 1
+  const canGoBack = prevYear >= 2020
+  const canGoForward = nextYear <= currentYear
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 0, fontFamily: "'Courier Prime', monospace", fontSize: 13 }}>
+      {canGoBack ? (
+        <a href={`/dashboard?year=${prevYear}`} style={{ padding: '4px 10px', border: '1.5px solid var(--ink)', borderRight: 'none', color: 'var(--ink)', textDecoration: 'none', background: 'var(--paper)' }}>←</a>
+      ) : (
+        <span style={{ padding: '4px 10px', border: '1.5px solid var(--rule)', borderRight: 'none', color: 'var(--rule)', background: 'var(--paper)' }}>←</span>
+      )}
+      <span style={{ padding: '4px 16px', border: '1.5px solid var(--ink)', fontWeight: 700, background: year === currentYear ? 'var(--ink)' : 'var(--paper)', color: year === currentYear ? 'var(--paper)' : 'var(--ink)' }}>
+        {year}
+      </span>
+      {canGoForward ? (
+        <a href={`/dashboard?year=${nextYear}`} style={{ padding: '4px 10px', border: '1.5px solid var(--ink)', borderLeft: 'none', color: 'var(--ink)', textDecoration: 'none', background: 'var(--paper)' }}>→</a>
+      ) : (
+        <span style={{ padding: '4px 10px', border: '1.5px solid var(--rule)', borderLeft: 'none', color: 'var(--rule)', background: 'var(--paper)' }}>→</span>
+      )}
+    </div>
+  )
+}
+
+export default async function DashboardHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string }>
+}) {
+  const { year: yearParam } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -20,7 +49,12 @@ export default async function DashboardHome() {
     .single()
   if (!m) redirect('/setup')
 
-  const year = new Date().getFullYear()
+  const currentYear = new Date().getFullYear()
+  const year = (() => {
+    const y = parseInt(yearParam ?? '', 10)
+    if (!isNaN(y) && y >= 2020 && y <= currentYear) return y
+    return currentYear
+  })()
   const debut = `${year}-01-01`
   const fin   = `${year}-12-31`
 
@@ -73,7 +107,7 @@ export default async function DashboardHome() {
   const m0 = today.getMonth() // 0-based
   const currentQuarter = Math.floor(m0 / 3) // 0-3
   const quarterEndMonth = (currentQuarter + 1) * 3 // 3, 6, 9, 12
-  const quarterEndDate = new Date(year, quarterEndMonth, 0) // last day of quarter
+  const quarterEndDate = new Date(currentYear, quarterEndMonth, 0) // last day of quarter
   const daysToQuarterEnd = Math.ceil((quarterEndDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
   const showTvaAlert = daysToQuarterEnd >= 0 && daysToQuarterEnd <= 15
 
@@ -89,9 +123,16 @@ export default async function DashboardHome() {
       <div className="dash-header">
         <div>
           <h1 className="dash-title">Vue d'ensemble</h1>
-          <p className="dash-subtitle">Exercice {year} — données en temps réel</p>
+          <p className="dash-subtitle">
+            Exercice {year}{year === currentYear ? ' — données en temps réel' : ' — données historiques'}
+          </p>
         </div>
-        <Link href="/transactions" className="dash-btn">+ Nouvelle entrée</Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <YearNav year={year} currentYear={currentYear} />
+          {year === currentYear && (
+            <Link href="/transactions" className="dash-btn">+ Nouvelle entrée</Link>
+          )}
+        </div>
       </div>
 
       {/* Alerts */}
