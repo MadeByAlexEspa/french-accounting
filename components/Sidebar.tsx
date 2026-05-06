@@ -79,6 +79,9 @@ export default function Sidebar({ workspace, userEmail }: Props) {
             </Link>
           ))}
         </div>
+        <div style={{ padding: '4px 12px 8px', fontSize: 11, color: 'var(--pencil)', fontFamily: "'Courier Prime', monospace" }}>
+          <kbd className="dash-kbd" style={{ fontSize: 10 }}>⌘K</kbd> palette
+        </div>
         <button onClick={handleLogout} className="sb-item" style={{ borderLeft: '3px solid transparent' }}>
           Déconnexion
         </button>

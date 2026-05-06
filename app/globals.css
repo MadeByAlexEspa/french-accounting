@@ -1216,6 +1216,66 @@ body {
   outline-offset: 2px;
 }
 
+/* ── Command Palette ── */
+.cp-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 120px;
+}
+.cp-panel {
+  width: 100%; max-width: 560px;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  display: flex; flex-direction: column;
+}
+.cp-search-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1.5px solid var(--rule);
+}
+.cp-search-icon { font-size: 18px; color: var(--pencil); flex-shrink: 0; }
+.cp-input {
+  flex: 1; border: none; outline: none; background: transparent;
+  font-family: 'Inter', sans-serif; font-size: 15px; color: var(--ink);
+}
+.cp-input::placeholder { color: var(--pencil); }
+.cp-list { max-height: 320px; overflow-y: auto; }
+.cp-empty {
+  padding: 24px; text-align: center;
+  font-size: 13px; color: var(--pencil);
+  font-family: 'Courier Prime', monospace;
+}
+.cp-item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 10px 16px;
+  border: none; background: transparent; cursor: pointer;
+  text-align: left; transition: background 0.08s;
+}
+.cp-item:hover, .cp-item-active { background: var(--offwhite); }
+.cp-item:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.cp-item-glyph {
+  width: 28px; height: 28px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Courier Prime', monospace; font-size: 14px;
+  color: var(--pencil); border: 1px solid var(--rule);
+  background: var(--paper);
+}
+.cp-item-body { display: flex; flex-direction: column; gap: 1px; }
+.cp-item-label { font-size: 14px; color: var(--ink); font-family: 'Inter', sans-serif; }
+.cp-item-sub { font-size: 11px; color: var(--pencil); font-family: 'Courier Prime', monospace; }
+.cp-footer {
+  display: flex; gap: 16px; padding: 8px 16px;
+  border-top: 1px solid var(--rule);
+  font-size: 11px; color: var(--pencil); font-family: 'Courier Prime', monospace;
+}
+.cp-footer span { display: flex; align-items: center; gap: 4px; }
+@media (max-width: 600px) {
+  .cp-overlay { padding-top: 60px; }
+  .cp-panel { max-width: 100%; margin: 0 12px; }
+}
+
 /* ─── Dashboard — Responsive ─── */
 
 /* Tablet: 768–1024px */
@@ -1349,4 +1409,54 @@ body {
   .settings-content {
     padding: 20px 16px;
   }
+}
+
+/* ── Print / Invoice ── */
+.print-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 32px; border-bottom: 1.5px solid var(--rule);
+  background: var(--paper);
+}
+.print-actions-back {
+  font-family: 'Courier Prime', monospace; font-size: 13px;
+  color: var(--ink); text-decoration: none;
+}
+.print-actions-back:hover { text-decoration: underline; }
+
+.print-invoice {
+  max-width: 720px; margin: 40px auto; padding: 48px;
+  background: var(--paper); border: 1.5px solid var(--rule);
+  font-family: 'Inter', sans-serif; font-size: 13px; color: var(--ink);
+}
+.print-inv-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+.print-inv-emetteur { line-height: 1.7; }
+.print-inv-company { font-family: 'Special Elite', cursive; font-size: 20px; margin-bottom: 4px; }
+.print-inv-meta { text-align: right; line-height: 1.7; }
+.print-inv-numero { font-family: 'Courier Prime', monospace; font-size: 18px; font-weight: bold; }
+.print-inv-statut { display: inline-block; margin-top: 6px; padding: 2px 10px; font-family: 'Courier Prime', monospace; font-size: 11px; letter-spacing: 0.05em; border: 1.5px solid; }
+.print-inv-statut-paid { border-color: #16a34a; color: #16a34a; }
+.print-inv-statut-pending { border-color: #d97706; color: #d97706; }
+
+.print-inv-section-label { font-family: 'Courier Prime', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pencil); margin-bottom: 4px; }
+.print-inv-client { margin-bottom: 24px; }
+.print-inv-client-name { font-size: 16px; font-weight: 600; }
+.print-inv-desc { margin-bottom: 24px; }
+
+.print-inv-table { width: 100%; border-collapse: collapse; margin: 32px 0; }
+.print-inv-table th { font-family: 'Courier Prime', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--pencil); padding: 8px 0; border-bottom: 2px solid var(--ink); }
+.print-inv-table td { padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.print-inv-table tfoot td { border-bottom: none; padding: 4px 0; }
+.print-inv-table .right { text-align: right; font-family: 'Courier Prime', monospace; }
+.print-inv-total-row td { border-top: 2px solid var(--ink); padding-top: 8px; }
+.print-inv-total-label { font-family: 'Courier Prime', monospace; font-size: 12px; color: var(--pencil); }
+.print-inv-total-value { font-family: 'Courier Prime', monospace; font-size: 18px; font-weight: bold; }
+
+.print-inv-footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--rule); font-size: 11px; color: var(--pencil); line-height: 1.7; }
+
+@media print {
+  .no-print { display: none !important; }
+  .sb-wrapper, .sb-sidebar, .sb-topbar, .sb-main, .sb-content { all: unset !important; display: block !important; }
+  .print-invoice { border: none; margin: 0; padding: 24px; max-width: 100%; box-shadow: none; }
+  body { background: white; }
+}
 }

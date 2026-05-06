@@ -890,6 +890,12 @@ export default function TransactionsPage() {
             onClick={() => { setActionError(null); if (isEntree) { setEditFact(row as unknown as Facture); setEditDep(null) } else { setEditDep(row as unknown as Depense); setEditFact(null) }; setShowForm(true) }}>
             Éditer
           </button>{' '}
+          {isEntree && (
+            <button className="dash-btn-ghost" style={{ padding: '3px 8px', fontSize: 11 }}
+              onClick={() => window.open(`/transactions/imprimer/${row.id}`, '_blank')}>
+              PDF
+            </button>
+          )}{' '}
           <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: 11, fontFamily: 'Courier Prime,monospace' }}
             onClick={() => setConfirmDelete(row)}>Suppr.</button>
         </td>
