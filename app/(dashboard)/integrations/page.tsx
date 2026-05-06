@@ -364,9 +364,16 @@ function QontoForm({ account, onSaved, onCancel }: {
           <label className="dash-field-label">IBAN (optionnel)</label>
           <input type="text" className="dash-field-input" value={iban} onChange={e => setIban(e.target.value)} placeholder="FR76..." />
         </div>
-        <div className="dash-field" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input type="checkbox" id="qonto-auto-sync" checked={autoSync} onChange={e => setAutoSync(e.target.checked)} />
-          <label htmlFor="qonto-auto-sync" className="dash-field-label" style={{ margin: 0 }}>Synchronisation automatique</label>
+        <div className="dash-field" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" id="qonto-auto-sync" checked={autoSync} onChange={e => setAutoSync(e.target.checked)} />
+            <label htmlFor="qonto-auto-sync" className="dash-field-label" style={{ margin: 0 }}>Synchronisation automatique</label>
+          </div>
+          {autoSync && (
+            <p style={{ fontSize: 11, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace', margin: '4px 0 0' }}>
+              Sync automatique toutes les 6h — prochaine exécution via Vercel Cron
+            </p>
+          )}
         </div>
 
         {error && <div className="dash-error">{error}</div>}
@@ -652,9 +659,16 @@ function ShineForm({ account, onSaved, onCancel }: {
           <label className="dash-field-label">IBAN (optionnel)</label>
           <input type="text" className="dash-field-input" value={iban} onChange={e => setIban(e.target.value)} placeholder="FR76..." />
         </div>
-        <div className="dash-field" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input type="checkbox" id="shine-auto-sync" checked={autoSync} onChange={e => setAutoSync(e.target.checked)} />
-          <label htmlFor="shine-auto-sync" className="dash-field-label" style={{ margin: 0 }}>Synchronisation automatique</label>
+        <div className="dash-field" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" id="shine-auto-sync" checked={autoSync} onChange={e => setAutoSync(e.target.checked)} />
+            <label htmlFor="shine-auto-sync" className="dash-field-label" style={{ margin: 0 }}>Synchronisation automatique</label>
+          </div>
+          {autoSync && (
+            <p style={{ fontSize: 11, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace', margin: '4px 0 0' }}>
+              Sync automatique toutes les 6h — prochaine exécution via Vercel Cron
+            </p>
+          )}
         </div>
 
         {error && <div className="dash-error">{error}</div>}

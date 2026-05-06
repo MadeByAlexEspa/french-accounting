@@ -22,9 +22,10 @@ const NAV_FOOTER = [
 interface Props {
   workspace: Pick<Workspace, 'name' | 'slug'> | null
   userEmail: string
+  userName?: string
 }
 
-export default function Sidebar({ workspace, userEmail }: Props) {
+export default function Sidebar({ workspace, userEmail, userName }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
   const router   = useRouter()
@@ -60,6 +61,11 @@ export default function Sidebar({ workspace, userEmail }: Props) {
       {workspace && (
         <div className="sb-workspace" title={userEmail}>
           {workspace.name}
+          {userName && (
+            <div style={{ fontSize: 11, color: 'var(--pencil)', fontFamily: "'Courier Prime', monospace", marginTop: 2, fontWeight: 400 }}>
+              {userName}
+            </div>
+          )}
         </div>
       )}
 

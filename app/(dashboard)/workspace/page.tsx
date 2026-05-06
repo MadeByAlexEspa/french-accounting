@@ -83,6 +83,7 @@ export default function WorkspacePage() {
   const [activeSection, setActiveSection] = useState<Section>('workspace')
   const [userId, setUserId]           = useState('')
   const [userEmail, setUserEmail]     = useState('')
+  const [userName, setUserName]       = useState('')
   const [userRole, setUserRole]       = useState<'owner' | 'admin' | 'member'>('member')
 
   const load = useCallback(async () => {
@@ -93,6 +94,7 @@ export default function WorkspacePage() {
       if (!user) { setError('Session expirée — rechargez la page.'); return }
       setUserId(user.id)
       setUserEmail(user.email ?? '')
+      setUserName(user.user_metadata?.full_name ?? '')
 
       const { data: m } = await supabase
         .from('memberships')
@@ -196,7 +198,7 @@ export default function WorkspacePage() {
             />
           )}
           {activeSection === 'compte' && (
-            <CompteSection userEmail={userEmail} />
+            <CompteSection userEmail={userEmail} userName={userName} />
           )}
           {activeSection === 'danger' && isOwner && (
             <DangerSection workspaceId={ws.id} />
@@ -965,10 +967,27 @@ function EquipeSection({
 
 // ─── CompteSection ────────────────────────────────────────────────────────────
 
-function CompteSection({ userEmail }: { userEmail: string }) {
+function CompteSection({ userEmail, userName }: { userEmail: string; userName: string }) {
   const [sending, setSending]   = useState(false)
   const [success, setSuccess]   = useState<string | null>(null)
   const [error, setError]       = useState<string | null>(null)
+
+  const [displayName, setDisplayName]   = useState(userName)
+  const [savingName, setSavingName]     = useState(false)
+  const [nameSuccess, setNameSuccess]   = useState<string | null>(null)
+  const [nameError, setNameError]       = useState<string | null>(null)
+
+  async function handleSaveName() {
+    if (!displayName.trim()) return
+    setSavingName(true); setNameSuccess(null); setNameError(null)
+    const supabase = createClient()
+    const { error: err } = await supabase.auth.updateUser({
+      data: { full_name: displayName.trim() }
+    })
+    setSavingName(false)
+    if (err) { setNameError(err.message) }
+    else { setNameSuccess('Nom mis à jour.') }
+  }
 
   async function handlePasswordReset() {
     setSending(true); setSuccess(null); setError(null)
@@ -989,6 +1008,34 @@ function CompteSection({ userEmail }: { userEmail: string }) {
       <div className="settings-section-header">
         <h2 className="settings-section-title">Mon compte</h2>
         <p className="settings-section-desc">Vos informations personnelles et sécurité</p>
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <div className="settings-sub-title">Nom affiché</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="text"
+            className="dash-field-input"
+            value={displayName}
+            onChange={e => { setDisplayName(e.target.value); setNameSuccess(null) }}
+            onKeyDown={e => { if (e.key === 'Enter') handleSaveName() }}
+            placeholder="Votre nom ou prénom"
+            maxLength={60}
+            style={{ maxWidth: 280 }}
+          />
+          <button
+            className="dash-btn-ghost"
+            onClick={handleSaveName}
+            disabled={savingName || !displayName.trim() || displayName.trim() === userName}
+          >
+            {savingName ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </div>
+        {nameSuccess && <div className="dash-success-msg" style={{ marginTop: 8 }} role="status">{nameSuccess}</div>}
+        {nameError   && <div className="dash-error"       style={{ marginTop: 8 }} role="alert">{nameError}</div>}
+        <p style={{ fontSize: 12, color: 'var(--pencil)', margin: '6px 0 0', fontFamily: 'Courier Prime,monospace' }}>
+          Affiché dans la sidebar et les emails envoyés depuis Compte-Pote.
+        </p>
       </div>
 
       <div style={{ marginBottom: 24 }}>

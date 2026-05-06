@@ -33,7 +33,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="sb-wrapper">
-      <Sidebar workspace={workspace} userEmail={user.email ?? ''} />
+      <Sidebar workspace={workspace} userEmail={user.email ?? ''} userName={user.user_metadata?.full_name ?? ''} />
       <main className="sb-main">
         <div className="sb-content">
           {children}
