@@ -12,6 +12,11 @@ export interface Database {
           slug: string
           activite_type: string | null
           structure_type: string | null
+          siret: string | null
+          tva_intra: string | null
+          adresse: string | null
+          code_postal: string | null
+          ville: string | null
           created_at: string
         }
         Insert: {
@@ -20,6 +25,11 @@ export interface Database {
           slug: string
           activite_type?: string | null
           structure_type?: string | null
+          siret?: string | null
+          tva_intra?: string | null
+          adresse?: string | null
+          code_postal?: string | null
+          ville?: string | null
           created_at?: string
         }
         Update: {
@@ -28,6 +38,11 @@ export interface Database {
           slug?: string
           activite_type?: string | null
           structure_type?: string | null
+          siret?: string | null
+          tva_intra?: string | null
+          adresse?: string | null
+          code_postal?: string | null
+          ville?: string | null
           created_at?: string
         }
         Relationships: []

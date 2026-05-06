@@ -1,19 +1,35 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import {
+  Settings, Users, User, AlertTriangle, Copy, Check, X,
+  RefreshCw, Send, ChevronDown,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Workspace } from '@/lib/types/database'
-import { createInvitation, listInvitations, cancelInvitation, resendInvitation, listMembersWithEmail, type InvitationRow, type MemberRow } from './actions'
+import {
+  createInvitation,
+  listInvitations,
+  cancelInvitation,
+  resendInvitation,
+  listMembersWithEmail,
+  updateMemberRole,
+  removeMember,
+  type InvitationRow,
+  type MemberRow,
+} from './actions'
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const ACTIVITE_OPTIONS = [
-  { value: '',             label: '— Non renseigné —' },
-  { value: 'saas',        label: 'SaaS / Logiciel' },
-  { value: 'conseil',     label: 'Conseil' },
-  { value: 'evenementiel',label: 'Événementiel' },
-  { value: 'commerce',    label: 'Commerce / Retail' },
-  { value: 'formation',   label: 'Formation' },
-  { value: 'immobilier',  label: 'Immobilier' },
-  { value: 'autre',       label: 'Autre' },
+  { value: '',              label: '— Non renseigné —' },
+  { value: 'saas',         label: 'SaaS / Logiciel' },
+  { value: 'conseil',      label: 'Conseil' },
+  { value: 'evenementiel', label: 'Événementiel' },
+  { value: 'commerce',     label: 'Commerce / Retail' },
+  { value: 'formation',    label: 'Formation' },
+  { value: 'immobilier',   label: 'Immobilier' },
+  { value: 'autre',        label: 'Autre' },
 ]
 
 const STRUCTURE_OPTIONS = [
@@ -27,146 +43,22 @@ const STRUCTURE_OPTIONS = [
   { value: 'autre', label: 'Autre' },
 ]
 
-type Tab = 'general' | 'membres'
+const AVATAR_COLORS = ['#fef3c7', '#dbeafe', '#dcfce7', '#fce7f3', '#e0e7ff', '#f3f4f6']
+
+type Section = 'workspace' | 'equipe' | 'compte' | 'danger'
 
 interface WorkspaceData extends Workspace {
   members: MemberRow[]
 }
 
-export default function WorkspacePage() {
-  const [ws, setWs]           = useState<WorkspaceData|null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string|null>(null)
-  const [tab, setTab]         = useState<Tab>('general')
-  const [userId, setUserId]   = useState('')
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null)
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setError('Session expirée — rechargez la page.'); return }
-      setUserId(user.id)
-      const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
-      if (!m) { setError('Workspace introuvable.'); return }
-      const { data: workspace, error: we } = await supabase.from('workspaces').select('*').eq('id', m.workspace_id).single()
-      if (we || !workspace) { setError(we?.message ?? 'Erreur'); return }
-      const { data: members } = await listMembersWithEmail()
-      setWs({ ...workspace, members: members ?? [] } as WorkspaceData)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { load() }, [load])
-
-  if (loading) return <div className="dash-loading">Chargement…</div>
-  if (error || !ws) return <div className="dash-error">{error ?? 'Erreur'}</div>
-
-  return (
-    <div className="dash-page">
-      <div className="dash-header">
-        <div>
-          <h1 className="dash-title">Workspace</h1>
-          <p className="dash-subtitle">Gérez les paramètres de votre espace de travail</p>
-        </div>
-      </div>
-
-      <div className="dash-tabs">
-        <button className={`dash-tab ${tab==='general'?'dash-tab-active':''}`} onClick={()=>setTab('general')}>Général</button>
-        <button className={`dash-tab ${tab==='membres'?'dash-tab-active':''}`} onClick={()=>setTab('membres')}>Membres ({ws.members.length})</button>
-      </div>
-
-      {tab === 'general' && <GeneralTab ws={ws} onSaved={load} currentUserId={userId} />}
-      {tab === 'membres' && <MembresTab members={ws.members} workspaceId={ws.id} currentUserId={userId} onChanged={load} />}
-    </div>
-  )
+function avatarColor(email: string): string {
+  return AVATAR_COLORS[email.charCodeAt(0) % AVATAR_COLORS.length]
 }
 
-function GeneralTab({ ws, onSaved, currentUserId }: { ws: WorkspaceData; onSaved: () => void; currentUserId: string }) {
-  const isOwner = ws.members.some(m => m.user_id === currentUserId && m.role === 'owner')
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-      <InfoSection ws={ws} onSaved={onSaved} />
-      <ProfileSection ws={ws} onSaved={onSaved} />
-      {isOwner && <DangerSection workspaceId={ws.id} />}
-    </div>
-  )
-}
-
-function InfoSection({ ws, onSaved }: { ws: WorkspaceData; onSaved: () => void }) {
-  const [name, setName]     = useState(ws.name)
-  const [saving, setSaving] = useState(false)
-  const [success, setSuccess] = useState<string|null>(null)
-  const [error, setError]   = useState<string|null>(null)
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setSaving(true); setSuccess(null); setError(null)
-    const supabase = createClient()
-    const { error: err } = await supabase.from('workspaces').update({ name }).eq('id', ws.id)
-    if (err) { setError(err.message) } else { setSuccess('Nom mis à jour.'); onSaved() }
-    setSaving(false)
-  }
-
-  return (
-    <div className="dash-card">
-      <div className="dash-card-title">Informations</div>
-      <div style={{ marginBottom:12, fontSize:13, color:'var(--pencil)', fontFamily:'Courier Prime,monospace' }}>
-        Slug : <strong>{ws.slug}</strong>
-      </div>
-      <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:12 }}>
-        <div className="dash-field"><label className="dash-field-label">Nom du workspace</label>
-          <div style={{ display:'flex', gap:12 }}>
-            <input type="text" className="dash-field-input" style={{ flex:1 }} value={name} onChange={e=>{setName(e.target.value);setSuccess(null)}} required minLength={2} />
-            <button type="submit" className="dash-btn" disabled={saving||name===ws.name}>{saving?'Enregistrement…':'Enregistrer'}</button>
-          </div>
-        </div>
-        {success && <div className="dash-success-msg">{success}</div>}
-        {error   && <div className="dash-error">{error}</div>}
-      </form>
-    </div>
-  )
-}
-
-function ProfileSection({ ws, onSaved }: { ws: WorkspaceData; onSaved: () => void }) {
-  const [activite, setActivite]   = useState(ws.activite_type ?? '')
-  const [structure, setStructure] = useState(ws.structure_type ?? '')
-  const [saving, setSaving]       = useState(false)
-  const [success, setSuccess]     = useState<string|null>(null)
-  const [error, setError]         = useState<string|null>(null)
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setSaving(true); setSuccess(null); setError(null)
-    const supabase = createClient()
-    const { error: err } = await supabase.from('workspaces').update({
-      activite_type: activite || null, structure_type: structure || null,
-    }).eq('id', ws.id)
-    if (err) { setError(err.message) } else { setSuccess('Profil enregistré.'); onSaved() }
-    setSaving(false)
-  }
-
-  const unchanged = activite === (ws.activite_type ?? '') && structure === (ws.structure_type ?? '')
-
-  return (
-    <div className="dash-card">
-      <div className="dash-card-title">Profil d&apos;activité</div>
-      <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:12 }}>
-        <div className="dash-field"><label className="dash-field-label">Type d&apos;activité</label>
-          <select className="dash-field-select" value={activite} onChange={e=>{setActivite(e.target.value);setSuccess(null)}}>
-            {ACTIVITE_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-          </select></div>
-        <div className="dash-field"><label className="dash-field-label">Type de structure</label>
-          <select className="dash-field-select" value={structure} onChange={e=>{setStructure(e.target.value);setSuccess(null)}}>
-            {STRUCTURE_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-          </select></div>
-        <div>
-          <button type="submit" className="dash-btn" disabled={saving||unchanged}>{saving?'Enregistrement…':'Enregistrer'}</button>
-        </div>
-        {success && <div className="dash-success-msg">{success}</div>}
-        {error   && <div className="dash-error">{error}</div>}
-      </form>
-    </div>
-  )
+function initials(email: string): string {
+  return email.charAt(0).toUpperCase()
 }
 
 function daysSince(dateStr: string): string {
@@ -179,40 +71,453 @@ function daysSince(dateStr: string): string {
 function inviteStatus(inv: InvitationRow): { label: string; cls: string } {
   if (inv.used_at) return { label: 'Acceptée', cls: 'dash-badge-green' }
   if (new Date(inv.expires_at) < new Date()) return { label: 'Expirée', cls: 'dash-badge-red' }
-  return { label: 'Envoyée', cls: 'dash-badge-blue' }
+  return { label: 'En attente', cls: 'dash-badge-blue' }
 }
 
-function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
-  members: WorkspaceData['members']; workspaceId: string; currentUserId: string; onChanged: () => void
+// ─── Root page ────────────────────────────────────────────────────────────────
+
+export default function WorkspacePage() {
+  const [ws, setWs]                   = useState<WorkspaceData | null>(null)
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState<string | null>(null)
+  const [activeSection, setActiveSection] = useState<Section>('workspace')
+  const [userId, setUserId]           = useState('')
+  const [userEmail, setUserEmail]     = useState('')
+  const [userRole, setUserRole]       = useState<'owner' | 'admin' | 'member'>('member')
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setError('Session expirée — rechargez la page.'); return }
+      setUserId(user.id)
+      setUserEmail(user.email ?? '')
+
+      const { data: m } = await supabase
+        .from('memberships')
+        .select('workspace_id, role')
+        .eq('user_id', user.id)
+        .single()
+      if (!m) { setError('Workspace introuvable.'); return }
+
+      setUserRole(m.role as 'owner' | 'admin' | 'member')
+
+      const { data: workspace, error: we } = await supabase
+        .from('workspaces')
+        .select('*')
+        .eq('id', m.workspace_id)
+        .single()
+      if (we || !workspace) { setError(we?.message ?? 'Erreur'); return }
+
+      const { data: members } = await listMembersWithEmail()
+      setWs({ ...workspace, members: members ?? [] } as WorkspaceData)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  if (loading) return <div className="dash-loading">Chargement…</div>
+  if (error || !ws) return <div className="dash-error">{error ?? 'Erreur inconnue'}</div>
+
+  const isOwner = userRole === 'owner'
+
+  return (
+    <div className="dash-page">
+      <div className="dash-header">
+        <div>
+          <h1 className="dash-title">Paramètres</h1>
+          <p className="dash-subtitle">Gérez votre workspace, votre équipe et votre compte</p>
+        </div>
+      </div>
+
+      <div className="settings-layout">
+        {/* Left nav */}
+        <nav className="settings-nav" aria-label="Sections des paramètres">
+          <span className="settings-nav-group">Workspace</span>
+
+          <button
+            className={`settings-nav-item${activeSection === 'workspace' ? ' settings-nav-item-active' : ''}`}
+            onClick={() => setActiveSection('workspace')}
+            aria-current={activeSection === 'workspace' ? 'page' : undefined}
+          >
+            <Settings size={15} aria-hidden="true" />
+            Général
+          </button>
+
+          <button
+            className={`settings-nav-item${activeSection === 'equipe' ? ' settings-nav-item-active' : ''}`}
+            onClick={() => setActiveSection('equipe')}
+            aria-current={activeSection === 'equipe' ? 'page' : undefined}
+          >
+            <Users size={15} aria-hidden="true" />
+            Équipe ({ws.members.length})
+          </button>
+
+          <span className="settings-nav-group">Mon compte</span>
+
+          <button
+            className={`settings-nav-item${activeSection === 'compte' ? ' settings-nav-item-active' : ''}`}
+            onClick={() => setActiveSection('compte')}
+            aria-current={activeSection === 'compte' ? 'page' : undefined}
+          >
+            <User size={15} aria-hidden="true" />
+            Mon compte
+          </button>
+
+          {isOwner && (
+            <>
+              <span className="settings-nav-group">Avancé</span>
+              <button
+                className={`settings-nav-item settings-nav-item-danger${activeSection === 'danger' ? ' settings-nav-item-active' : ''}`}
+                onClick={() => setActiveSection('danger')}
+                aria-current={activeSection === 'danger' ? 'page' : undefined}
+              >
+                <AlertTriangle size={15} aria-hidden="true" />
+                Zone de danger
+              </button>
+            </>
+          )}
+        </nav>
+
+        {/* Right content panel */}
+        <div className="settings-content">
+          {activeSection === 'workspace' && (
+            <WorkspaceSection ws={ws} onSaved={load} />
+          )}
+          {activeSection === 'equipe' && (
+            <EquipeSection
+              ws={ws}
+              currentUserId={userId}
+              currentUserRole={userRole}
+              onChanged={load}
+            />
+          )}
+          {activeSection === 'compte' && (
+            <CompteSection userEmail={userEmail} />
+          )}
+          {activeSection === 'danger' && isOwner && (
+            <DangerSection workspaceId={ws.id} />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── WorkspaceSection ─────────────────────────────────────────────────────────
+
+function WorkspaceSection({ ws, onSaved }: { ws: WorkspaceData; onSaved: () => void }) {
+  return (
+    <div>
+      <div className="settings-section-header">
+        <h2 className="settings-section-title">Informations générales</h2>
+        <p className="settings-section-desc">Nom et profil d&apos;activité de votre workspace</p>
+      </div>
+
+      <div className="settings-meta-row">
+        <span>Identifiant :</span>
+        <strong>{ws.slug}</strong>
+      </div>
+
+      <div className="settings-meta-row" style={{ marginBottom: 24 }}>
+        <span>Créé le :</span>
+        <strong>{new Date(ws.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>
+      </div>
+
+      <WorkspaceNameForm ws={ws} onSaved={onSaved} />
+      <WorkspaceProfileForm ws={ws} onSaved={onSaved} />
+      <WorkspaceFiscalForm ws={ws} onSaved={onSaved} />
+    </div>
+  )
+}
+
+function WorkspaceNameForm({ ws, onSaved }: { ws: WorkspaceData; onSaved: () => void }) {
+  const [name, setName]       = useState(ws.name)
+  const [saving, setSaving]   = useState(false)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true); setSuccess(null); setError(null)
+    const supabase = createClient()
+    const { error: err } = await supabase.from('workspaces').update({ name }).eq('id', ws.id)
+    if (err) { setError(err.message) } else { setSuccess('Nom mis à jour.'); onSaved() }
+    setSaving(false)
+  }
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div className="settings-sub-title">Nom du workspace</div>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="dash-field">
+          <label className="dash-field-label" htmlFor="ws-name">Nom affiché</label>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <input
+              id="ws-name"
+              type="text"
+              className="dash-field-input"
+              style={{ flex: 1 }}
+              value={name}
+              onChange={e => { setName(e.target.value); setSuccess(null) }}
+              required
+              minLength={2}
+            />
+            <button type="submit" className="dash-btn" disabled={saving || name === ws.name}>
+              {saving ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
+        {success && <div className="dash-success-msg">{success}</div>}
+        {error   && <div className="dash-error" role="alert">{error}</div>}
+      </form>
+    </div>
+  )
+}
+
+function WorkspaceProfileForm({ ws, onSaved }: { ws: WorkspaceData; onSaved: () => void }) {
+  const [activite, setActivite]   = useState(ws.activite_type ?? '')
+  const [structure, setStructure] = useState(ws.structure_type ?? '')
+  const [saving, setSaving]       = useState(false)
+  const [success, setSuccess]     = useState<string | null>(null)
+  const [error, setError]         = useState<string | null>(null)
+
+  const unchanged = activite === (ws.activite_type ?? '') && structure === (ws.structure_type ?? '')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true); setSuccess(null); setError(null)
+    const supabase = createClient()
+    const { error: err } = await supabase.from('workspaces').update({
+      activite_type: activite || null,
+      structure_type: structure || null,
+    }).eq('id', ws.id)
+    if (err) { setError(err.message) } else { setSuccess('Profil enregistré.'); onSaved() }
+    setSaving(false)
+  }
+
+  return (
+    <div>
+      <div className="settings-sub-title">Profil d&apos;activité</div>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="dash-field">
+          <label className="dash-field-label" htmlFor="ws-activite">Type d&apos;activité</label>
+          <select
+            id="ws-activite"
+            className="dash-field-select"
+            value={activite}
+            onChange={e => { setActivite(e.target.value); setSuccess(null) }}
+          >
+            {ACTIVITE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div className="dash-field">
+          <label className="dash-field-label" htmlFor="ws-structure">Type de structure</label>
+          <select
+            id="ws-structure"
+            className="dash-field-select"
+            value={structure}
+            onChange={e => { setStructure(e.target.value); setSuccess(null) }}
+          >
+            {STRUCTURE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <button type="submit" className="dash-btn" disabled={saving || unchanged}>
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </div>
+        {success && <div className="dash-success-msg">{success}</div>}
+        {error   && <div className="dash-error" role="alert">{error}</div>}
+      </form>
+    </div>
+  )
+}
+
+function WorkspaceFiscalForm({ ws, onSaved }: { ws: WorkspaceData; onSaved: () => void }) {
+  const [siret,      setSiret]      = useState(ws.siret       ?? '')
+  const [tvaIntra,   setTvaIntra]   = useState(ws.tva_intra   ?? '')
+  const [adresse,    setAdresse]    = useState(ws.adresse      ?? '')
+  const [codePostal, setCodePostal] = useState(ws.code_postal ?? '')
+  const [ville,      setVille]      = useState(ws.ville        ?? '')
+  const [saving,     setSaving]     = useState(false)
+  const [success,    setSuccess]    = useState<string | null>(null)
+  const [error,      setError]      = useState<string | null>(null)
+
+  const unchanged =
+    siret      === (ws.siret       ?? '') &&
+    tvaIntra   === (ws.tva_intra   ?? '') &&
+    adresse    === (ws.adresse      ?? '') &&
+    codePostal === (ws.code_postal ?? '') &&
+    ville      === (ws.ville        ?? '')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (siret && !/^\d{14}$/.test(siret.replace(/\s/g, ''))) {
+      setError('Le SIRET doit contenir exactement 14 chiffres.')
+      return
+    }
+    if (tvaIntra && !/^FR\d{11}$/i.test(tvaIntra.replace(/\s/g, ''))) {
+      setError('Le N° TVA intracommunautaire doit être au format FR + 11 chiffres.')
+      return
+    }
+    setSaving(true); setSuccess(null); setError(null)
+    const supabase = createClient()
+    const { error: err } = await supabase.from('workspaces').update({
+      siret:       siret.replace(/\s/g, '')       || null,
+      tva_intra:   tvaIntra.replace(/\s/g, '')    || null,
+      adresse:     adresse.trim()                 || null,
+      code_postal: codePostal.trim()              || null,
+      ville:       ville.trim()                   || null,
+    }).eq('id', ws.id)
+    if (err) { setError(err.message) } else { setSuccess('Informations fiscales enregistrées.'); onSaved() }
+    setSaving(false)
+  }
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div className="settings-sub-title">Informations fiscales</div>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="dash-field-row">
+          <div className="dash-field">
+            <label className="dash-field-label" htmlFor="ws-siret">SIRET</label>
+            <input
+              id="ws-siret"
+              type="text"
+              className="dash-field-input"
+              placeholder="123 456 789 01234"
+              value={siret}
+              maxLength={17}
+              onChange={e => { setSiret(e.target.value); setSuccess(null); setError(null) }}
+            />
+          </div>
+          <div className="dash-field">
+            <label className="dash-field-label" htmlFor="ws-tva">N° TVA intracommunautaire</label>
+            <input
+              id="ws-tva"
+              type="text"
+              className="dash-field-input"
+              placeholder="FR12345678901"
+              value={tvaIntra}
+              maxLength={15}
+              onChange={e => { setTvaIntra(e.target.value); setSuccess(null); setError(null) }}
+            />
+          </div>
+        </div>
+        <div className="dash-field">
+          <label className="dash-field-label" htmlFor="ws-adresse">Adresse</label>
+          <input
+            id="ws-adresse"
+            type="text"
+            className="dash-field-input"
+            placeholder="12 rue de la Paix"
+            value={adresse}
+            onChange={e => { setAdresse(e.target.value); setSuccess(null) }}
+          />
+        </div>
+        <div className="dash-field-row">
+          <div className="dash-field">
+            <label className="dash-field-label" htmlFor="ws-cp">Code postal</label>
+            <input
+              id="ws-cp"
+              type="text"
+              className="dash-field-input"
+              placeholder="75001"
+              value={codePostal}
+              maxLength={10}
+              onChange={e => { setCodePostal(e.target.value); setSuccess(null) }}
+            />
+          </div>
+          <div className="dash-field">
+            <label className="dash-field-label" htmlFor="ws-ville">Ville</label>
+            <input
+              id="ws-ville"
+              type="text"
+              className="dash-field-input"
+              placeholder="Paris"
+              value={ville}
+              onChange={e => { setVille(e.target.value); setSuccess(null) }}
+            />
+          </div>
+        </div>
+        <div>
+          <button type="submit" className="dash-btn" disabled={saving || unchanged}>
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </div>
+        {success && <div className="dash-success-msg">{success}</div>}
+        {error   && <div className="dash-error" role="alert">{error}</div>}
+      </form>
+    </div>
+  )
+}
+
+// ─── EquipeSection ────────────────────────────────────────────────────────────
+
+function EquipeSection({
+  ws,
+  currentUserId,
+  currentUserRole,
+  onChanged,
+}: {
+  ws: WorkspaceData
+  currentUserId: string
+  currentUserRole: 'owner' | 'admin' | 'member'
+  onChanged: () => void
 }) {
+  const [members, setMembers]             = useState<MemberRow[]>(ws.members)
   const [invitations, setInvitations]     = useState<InvitationRow[]>([])
   const [showInviteForm, setShowInviteForm] = useState(false)
   const [inviteEmail, setInviteEmail]     = useState('')
+  const [inviteRole, setInviteRole]       = useState<'admin' | 'member'>('member')
   const [inviting, setInviting]           = useState(false)
-  const [inviteError, setInviteError]     = useState<string|null>(null)
-  const [generatedUrl, setGeneratedUrl]   = useState<string|null>(null)
-  const [copiedId, setCopiedId]           = useState<string|null>(null)
-  const [resendingId, setResendingId]     = useState<string|null>(null)
-  const [resendError, setResendError]     = useState<string|null>(null)
-  const [resendSuccess, setResendSuccess] = useState<string|null>(null)
-  const [resendUrl, setResendUrl]       = useState<string|null>(null)
+  const [inviteError, setInviteError]     = useState<string | null>(null)
+  const [generatedUrl, setGeneratedUrl]   = useState<string | null>(null)
+  const [urlExpiry, setUrlExpiry]         = useState<ReturnType<typeof setTimeout> | null>(null)
+  const [copiedId, setCopiedId]           = useState<string | null>(null)
+  const [resendingId, setResendingId]     = useState<string | null>(null)
+  const [resendError, setResendError]     = useState<string | null>(null)
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null)
+  const [resendUrl, setResendUrl]         = useState<string | null>(null)
+  const [roleError, setRoleError]         = useState<string | null>(null)
+  const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null)
+  const [removing, setRemoving]           = useState(false)
+  const [removeError, setRemoveError]     = useState<string | null>(null)
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null)
+  const [cancelling, setCancelling]       = useState(false)
 
   const loadInvitations = useCallback(async () => {
     const res = await listInvitations()
     if (res.data) setInvitations(res.data)
   }, [])
 
+  // Keep local members in sync with parent
+  useEffect(() => { setMembers(ws.members) }, [ws.members])
   useEffect(() => { loadInvitations() }, [loadInvitations])
+
+  const appUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/invite/`
+      : '/invite/'
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
     setInviting(true); setInviteError(null); setGeneratedUrl(null)
-    const res = await createInvitation(inviteEmail)
+    if (urlExpiry) clearTimeout(urlExpiry)
+
+    const res = await createInvitation(inviteEmail, inviteRole)
     setInviting(false)
     if (res.error) { setInviteError(res.error); return }
     setGeneratedUrl(res.inviteUrl ?? null)
     setInviteEmail('')
+    setInviteRole('member')
     loadInvitations()
+    onChanged()
+
+    // Auto-hide the generated URL after 10 seconds
+    const t = setTimeout(() => setGeneratedUrl(null), 10000)
+    setUrlExpiry(t)
   }
 
   async function handleCopy(text: string, id: string) {
@@ -221,10 +526,26 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  async function handleCancel(id: string) {
-    if (!confirm('Annuler cette invitation ?')) return
-    const res = await cancelInvitation(id)
-    if (!res.error) loadInvitations()
+  async function handleRoleChange(memberId: string, newRole: 'admin' | 'member') {
+    setRoleError(null)
+    // Optimistic update
+    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m))
+    const res = await updateMemberRole(memberId, newRole)
+    if (res.error) {
+      setRoleError(res.error)
+      // Revert
+      onChanged()
+    }
+  }
+
+  async function handleRemoveConfirmed() {
+    if (!removeConfirmId) return
+    setRemoving(true); setRemoveError(null)
+    const res = await removeMember(removeConfirmId)
+    setRemoving(false)
+    if (res.error) { setRemoveError(res.error); return }
+    setRemoveConfirmId(null)
+    onChanged()
   }
 
   async function handleResend(id: string) {
@@ -238,196 +559,378 @@ function MembresTab({ members, workspaceId, currentUserId, onChanged }: {
     loadInvitations()
   }
 
-  const appUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/invite/`
-      : '/invite/'
+  async function handleCancelConfirmed() {
+    if (!cancelConfirmId) return
+    setCancelling(true)
+    const res = await cancelInvitation(cancelConfirmId)
+    setCancelling(false)
+    if (!res.error) {
+      setCancelConfirmId(null)
+      loadInvitations()
+    }
+  }
 
-  const pendingCount = invitations.filter(i => !i.used_at && new Date(i.expires_at) >= new Date()).length
+  function canChangeRole(target: MemberRow): boolean {
+    if (target.user_id === currentUserId) return false
+    if (target.role === 'owner') return false
+    if (currentUserRole === 'owner') return true
+    if (currentUserRole === 'admin' && target.role === 'member') return true
+    return false
+  }
+
+  function canRemove(target: MemberRow): boolean {
+    if (target.user_id === currentUserId) return false
+    if (target.role === 'owner') return false
+    if (currentUserRole === 'owner') return true
+    if (currentUserRole === 'admin' && target.role === 'member') return true
+    return false
+  }
+
+  const pendingInvitations = invitations.filter(
+    i => !i.used_at
+  )
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-
-      {/* Members table */}
-      <div className="dash-card">
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-          <div className="dash-card-title" style={{ margin:0 }}>Membres ({members.length})</div>
-          <button className="dash-btn" onClick={() => { setShowInviteForm(v=>!v); setGeneratedUrl(null); setInviteError(null) }}>
-            + Inviter un membre
-          </button>
+    <div>
+      <div className="settings-section-header">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h2 className="settings-section-title">Équipe</h2>
+            <p className="settings-section-desc">{members.length} membre{members.length !== 1 ? 's' : ''}</p>
+          </div>
+          {currentUserRole !== 'member' && (
+            <button
+              className="dash-btn"
+              onClick={() => { setShowInviteForm(v => !v); setGeneratedUrl(null); setInviteError(null) }}
+            >
+              <Send size={14} aria-hidden="true" />
+              Inviter
+            </button>
+          )}
         </div>
+      </div>
 
-        {showInviteForm && (
-          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:6, padding:16, marginBottom:16 }}>
-            <form onSubmit={handleInvite} style={{ display:'flex', gap:10, alignItems:'flex-end', flexWrap:'wrap' }}>
-              <div className="dash-field" style={{ flex:1, minWidth:220, margin:0 }}>
-                <label className="dash-field-label">Adresse email</label>
-                <input
-                  type="email" className="dash-field-input"
-                  placeholder="collegue@exemple.com"
-                  value={inviteEmail}
-                  onChange={e => { setInviteEmail(e.target.value); setInviteError(null); setGeneratedUrl(null) }}
-                  required autoFocus
-                />
-              </div>
-              <button type="submit" className="dash-btn" disabled={inviting}>
-                {inviting ? 'Envoi…' : "Envoyer l'invitation"}
+      {/* Invite form */}
+      {showInviteForm && (
+        <div className="invite-form-wrap">
+          <div className="settings-sub-title">Nouvelle invitation</div>
+          <form onSubmit={handleInvite} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div className="dash-field" style={{ flex: 1, minWidth: 200, margin: 0 }}>
+              <label className="dash-field-label" htmlFor="invite-email">Adresse email</label>
+              <input
+                id="invite-email"
+                type="email"
+                className="dash-field-input"
+                placeholder="collegue@exemple.com"
+                value={inviteEmail}
+                onChange={e => { setInviteEmail(e.target.value); setInviteError(null); setGeneratedUrl(null) }}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="dash-field" style={{ minWidth: 140, margin: 0 }}>
+              <label className="dash-field-label" htmlFor="invite-role">Rôle</label>
+              <select
+                id="invite-role"
+                className="dash-field-select"
+                value={inviteRole}
+                onChange={e => setInviteRole(e.target.value as 'admin' | 'member')}
+              >
+                <option value="member">Membre</option>
+                <option value="admin">Administrateur</option>
+              </select>
+            </div>
+            <button type="submit" className="dash-btn" disabled={inviting} style={{ marginBottom: 0 }}>
+              {inviting ? 'Envoi…' : 'Envoyer'}
+            </button>
+          </form>
+          {inviteError && <div className="dash-error" style={{ marginTop: 10 }} role="alert">{inviteError}</div>}
+          {generatedUrl && (
+            <div style={{ marginTop: 12, padding: 12, background: '#fff', border: '1px solid var(--rule)', borderRadius: 2, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'Courier Prime,monospace', fontSize: 12, color: 'var(--pencil)', wordBreak: 'break-all', flex: 1 }}>
+                {generatedUrl}
+              </span>
+              <button
+                className="dash-btn-ghost"
+                style={{ flexShrink: 0, fontSize: 12, padding: '5px 12px' }}
+                onClick={() => handleCopy(generatedUrl, 'new')}
+                aria-label="Copier le lien d'invitation"
+              >
+                {copiedId === 'new' ? <><Check size={13} /> Copié</> : <><Copy size={13} /> Copier</>}
               </button>
-            </form>
-            {inviteError && <div className="dash-error" style={{ marginTop:10 }}>{inviteError}</div>}
-            {generatedUrl && (
-              <div style={{ marginTop:12, padding:12, background:'var(--bg)', borderRadius:4, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                <span style={{ fontSize:12, color:'var(--pencil)', fontFamily:'Courier Prime,monospace', wordBreak:'break-all', flex:1 }}>
-                  {generatedUrl}
-                </span>
-                <button className="dash-btn" style={{ flexShrink:0 }} onClick={() => handleCopy(generatedUrl, 'new')}>
-                  {copiedId === 'new' ? '✓ Copié' : 'Copier'}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="dash-table-wrap"><table className="dash-table">
-          <thead><tr><th>Email</th><th>Rôle</th><th>Membre depuis</th><th></th></tr></thead>
-          <tbody>
-            {members.length === 0 && <tr><td colSpan={4} className="dash-empty">Aucun membre.</td></tr>}
-            {members.map(m=>(
-              <tr key={m.id}>
-                <td style={{ fontSize:13 }}>{m.email}{m.user_id === currentUserId ? ' (vous)' : ''}</td>
-                <td><span className={`dash-badge ${m.role==='owner'||m.role==='admin'?'dash-badge-blue':'dash-badge-gray'}`}>{m.role}</span></td>
-                <td style={{ fontSize:12, color:'var(--pencil)' }}>{new Date(m.created_at).toLocaleDateString('fr-FR')}</td>
-                <td></td>
-              </tr>
-            ))}
-          </tbody>
-        </table></div>
-      </div>
-
-      {/* Invitations management */}
-      <div className="dash-card">
-        <div className="dash-card-title">
-          Invitations{invitations.length > 0 ? ` — ${pendingCount} en attente` : ''}
+            </div>
+          )}
         </div>
-        {resendError   && <div className="dash-error"       role="alert" style={{ marginBottom:12 }}>{resendError}</div>}
-        {resendSuccess && (
-          <div className="dash-success-msg" role="status" style={{ marginBottom:12 }}>
-            {resendSuccess}
-            {resendUrl && (
-              <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:8, flexWrap:'wrap' }}>
-                <span style={{ fontFamily:'Courier Prime,monospace', fontSize:11, color:'var(--pencil)', wordBreak:'break-all', flex:1 }}>
-                  {resendUrl}
-                </span>
-                <button
-                  className="dash-btn-ghost"
-                  style={{ fontSize:11, padding:'2px 8px', flexShrink:0 }}
-                  onClick={() => handleCopy(resendUrl, 'resend')}
-                >
-                  {copiedId === 'resend' ? '✓ Copié' : 'Copier'}
-                </button>
+      )}
+
+      {/* Role error banner */}
+      {roleError && (
+        <div className="dash-error" role="alert" style={{ marginBottom: 12 }}>{roleError}</div>
+      )}
+
+      {/* Members list */}
+      <div style={{ marginBottom: 32 }}>
+        {members.map(member => {
+          const isSelf = member.user_id === currentUserId
+          const roleBadgeCls =
+            member.role === 'owner' ? 'dash-badge-blue'
+            : member.role === 'admin' ? 'dash-badge-orange'
+            : 'dash-badge-gray'
+          const roleLabel =
+            member.role === 'owner' ? 'Propriétaire'
+            : member.role === 'admin' ? 'Admin'
+            : 'Membre'
+
+          return (
+            <div key={member.id} className="member-row">
+              <div
+                className="member-avatar"
+                style={{ background: avatarColor(member.email) }}
+                aria-hidden="true"
+              >
+                {initials(member.email)}
               </div>
-            )}
-          </div>
-        )}
-
-        {invitations.length === 0 ? (
-          <div className="dash-empty" style={{ padding:'16px 0' }}>Aucune invitation envoyée.</div>
-        ) : (
-          <div className="dash-table-wrap">
-            <table className="dash-table">
-              <thead>
-                <tr>
-                  <th>Email</th>
-                  <th>Envoyée</th>
-                  <th>Statut</th>
-                  <th>Lien / Token</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {invitations.map(inv => {
-                  const st = inviteStatus(inv)
-                  const isPending = !inv.used_at && new Date(inv.expires_at) >= new Date()
-                  const isExpired = !inv.used_at && new Date(inv.expires_at) < new Date()
-                  const fullUrl = `${appUrl}${inv.token}`
-
-                  return (
-                    <tr key={inv.id}>
-                      <td style={{ fontWeight:500 }}>{inv.email}</td>
-
-                      <td style={{ fontSize:12, color:'var(--pencil)', whiteSpace:'nowrap' }}>
-                        {daysSince(inv.created_at)}
-                      </td>
-
-                      <td>
-                        <span className={`dash-badge ${st.cls}`}>{st.label}</span>
-                      </td>
-
-                      {/* Token + copy */}
-                      <td>
-                        {!inv.used_at && (
-                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                            <span style={{
-                              fontFamily:'Courier Prime,monospace', fontSize:11,
-                              color:'var(--pencil)', letterSpacing:'0.02em',
-                              opacity: isExpired ? 0.45 : 1,
-                            }}>
-                              {inv.token.slice(0, 12)}…
-                            </span>
-                            <button
-                              className="dash-btn-ghost"
-                              style={{ fontSize:11, padding:'2px 8px', flexShrink:0 }}
-                              onClick={() => handleCopy(fullUrl, inv.id)}
-                              title="Copier le lien complet"
-                            >
-                              {copiedId === inv.id ? '✓' : 'Copier'}
-                            </button>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td>
-                        <div style={{ display:'flex', gap:6, justifyContent:'flex-end' }}>
-                          {(isPending || isExpired) && (
-                            <button
-                              className="dash-btn-ghost"
-                              style={{ fontSize:12, padding:'4px 10px' }}
-                              disabled={resendingId === inv.id}
-                              onClick={() => handleResend(inv.id)}
-                              title={isExpired ? 'Générer un nouveau lien et renvoyer' : 'Renvoyer le lien'}
-                            >
-                              {resendingId === inv.id ? '…' : isExpired ? 'Renouveler' : 'Renvoyer'}
-                            </button>
-                          )}
-                          {isPending && (
-                            <button
-                              className="dash-btn-ghost"
-                              style={{ fontSize:12, padding:'4px 10px', color:'var(--danger, #dc2626)' }}
-                              onClick={() => handleCancel(inv.id)}
-                            >
-                              Annuler
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+              <div className="member-info">
+                <div className="member-email">
+                  {member.email}
+                  {isSelf && <span style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)', marginLeft: 6 }}>(vous)</span>}
+                </div>
+                <div className="member-since">Membre depuis {new Date(member.created_at).toLocaleDateString('fr-FR')}</div>
+              </div>
+              <div className="member-actions">
+                <span className={`dash-badge ${roleBadgeCls}`}>{roleLabel}</span>
+                {canChangeRole(member) && (
+                  <select
+                    className="settings-role-select"
+                    value={member.role}
+                    onChange={e => handleRoleChange(member.id, e.target.value as 'admin' | 'member')}
+                    aria-label={`Changer le rôle de ${member.email}`}
+                  >
+                    <option value="member">Membre</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                )}
+                {canRemove(member) && (
+                  <button
+                    className="settings-remove-btn"
+                    onClick={() => setRemoveConfirmId(member.id)}
+                    aria-label={`Retirer ${member.email} de l'équipe`}
+                    title="Retirer du workspace"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
+      {/* Pending invitations */}
+      {pendingInvitations.length > 0 && (
+        <div>
+          <div className="settings-sub-title">Invitations en cours</div>
+
+          {resendError   && <div className="dash-error" role="alert" style={{ marginBottom: 12 }}>{resendError}</div>}
+          {resendSuccess && (
+            <div className="dash-success-msg" role="status" style={{ marginBottom: 12 }}>
+              {resendSuccess}
+              {resendUrl && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)', wordBreak: 'break-all', flex: 1 }}>
+                    {resendUrl}
+                  </span>
+                  <button
+                    className="dash-btn-ghost"
+                    style={{ fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
+                    onClick={() => handleCopy(resendUrl, 'resend')}
+                  >
+                    {copiedId === 'resend' ? '✓ Copié' : 'Copier'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {pendingInvitations.map(inv => {
+            const st = inviteStatus(inv)
+            const isPending = !inv.used_at && new Date(inv.expires_at) >= new Date()
+            const isExpired = !inv.used_at && new Date(inv.expires_at) < new Date()
+            const fullUrl = `${appUrl}${inv.token}`
+
+            return (
+              <div key={inv.id} className="member-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                <div
+                  className="member-avatar"
+                  style={{ background: avatarColor(inv.email), opacity: 0.6 }}
+                  aria-hidden="true"
+                >
+                  {initials(inv.email)}
+                </div>
+                <div className="member-info">
+                  <div className="member-email">{inv.email}</div>
+                  <div className="member-since">Envoyée {daysSince(inv.created_at)}</div>
+                </div>
+                <div className="member-actions" style={{ flexWrap: 'wrap' }}>
+                  <span className={`dash-badge ${st.cls}`}>{st.label}</span>
+
+                  {!inv.used_at && (
+                    <button
+                      className="dash-btn-ghost"
+                      style={{ fontSize: 11, padding: '4px 10px' }}
+                      onClick={() => handleCopy(fullUrl, inv.id)}
+                      aria-label="Copier le lien d'invitation"
+                      title="Copier le lien"
+                    >
+                      {copiedId === inv.id ? <Check size={12} /> : <Copy size={12} />}
+                    </button>
+                  )}
+
+                  {(isPending || isExpired) && currentUserRole !== 'member' && (
+                    <button
+                      className="dash-btn-ghost"
+                      style={{ fontSize: 11, padding: '4px 10px' }}
+                      disabled={resendingId === inv.id}
+                      onClick={() => handleResend(inv.id)}
+                      aria-label={isExpired ? 'Renouveler l\'invitation' : 'Renvoyer l\'invitation'}
+                      title={isExpired ? 'Générer un nouveau lien' : 'Renvoyer le lien'}
+                    >
+                      {resendingId === inv.id ? '…' : <><RefreshCw size={12} /> {isExpired ? 'Renouveler' : 'Renvoyer'}</>}
+                    </button>
+                  )}
+
+                  {isPending && currentUserRole !== 'member' && (
+                    <button
+                      className="dash-btn-ghost"
+                      style={{ fontSize: 11, padding: '4px 10px', color: '#dc2626' }}
+                      onClick={() => setCancelConfirmId(inv.id)}
+                      aria-label={`Annuler l'invitation de ${inv.email}`}
+                    >
+                      Annuler
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Remove member confirmation modal */}
+      {removeConfirmId && (
+        <div className="dash-modal-backdrop" onClick={() => !removing && setRemoveConfirmId(null)}>
+          <div className="dash-modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="dash-modal-header">
+              <h2 className="dash-modal-title">Retirer le membre</h2>
+              <button className="dash-modal-close" aria-label="Fermer" onClick={() => setRemoveConfirmId(null)}>×</button>
+            </div>
+            <div className="dash-modal-body">
+              <p style={{ fontSize: 14, color: 'var(--pencil)', margin: 0 }}>
+                Ce membre perdra l&apos;accès au workspace. Cette action peut être annulée en les réinvitant.
+              </p>
+              {removeError && <div className="dash-error" role="alert">{removeError}</div>}
+            </div>
+            <div className="dash-modal-footer">
+              <button className="dash-btn-ghost" onClick={() => setRemoveConfirmId(null)} disabled={removing}>Annuler</button>
+              <button className="dash-btn-danger" onClick={handleRemoveConfirmed} disabled={removing}>
+                {removing ? 'Suppression…' : 'Retirer du workspace'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel invitation confirmation modal */}
+      {cancelConfirmId && (
+        <div className="dash-modal-backdrop" onClick={() => !cancelling && setCancelConfirmId(null)}>
+          <div className="dash-modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="dash-modal-header">
+              <h2 className="dash-modal-title">Annuler l&apos;invitation</h2>
+              <button className="dash-modal-close" aria-label="Fermer" onClick={() => setCancelConfirmId(null)}>×</button>
+            </div>
+            <div className="dash-modal-body">
+              <p style={{ fontSize: 14, color: 'var(--pencil)', margin: 0 }}>
+                Le lien d&apos;invitation sera invalidé. Vous pourrez envoyer une nouvelle invitation si nécessaire.
+              </p>
+            </div>
+            <div className="dash-modal-footer">
+              <button className="dash-btn-ghost" onClick={() => setCancelConfirmId(null)} disabled={cancelling}>Fermer</button>
+              <button className="dash-btn-danger" onClick={handleCancelConfirmed} disabled={cancelling}>
+                {cancelling ? 'Annulation…' : "Annuler l'invitation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
+// ─── CompteSection ────────────────────────────────────────────────────────────
+
+function CompteSection({ userEmail }: { userEmail: string }) {
+  const [sending, setSending]   = useState(false)
+  const [success, setSuccess]   = useState<string | null>(null)
+  const [error, setError]       = useState<string | null>(null)
+
+  async function handlePasswordReset() {
+    setSending(true); setSuccess(null); setError(null)
+    const supabase = createClient()
+    const redirectTo =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/reset-password`
+        : '/reset-password'
+    const { error: err } = await supabase.auth.resetPasswordForEmail(userEmail, { redirectTo })
+    setSending(false)
+    if (err) { setError(err.message) } else {
+      setSuccess(`Un email de réinitialisation a été envoyé à ${userEmail}.`)
+    }
+  }
+
+  return (
+    <div>
+      <div className="settings-section-header">
+        <h2 className="settings-section-title">Mon compte</h2>
+        <p className="settings-section-desc">Vos informations personnelles et sécurité</p>
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <div className="settings-sub-title">Adresse email</div>
+        <div className="settings-meta-row">
+          <User size={13} aria-hidden="true" />
+          <strong>{userEmail}</strong>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--pencil)', margin: '4px 0 0', fontFamily: 'Courier Prime,monospace' }}>
+          L&apos;email est géré par votre fournisseur d&apos;authentification.
+        </p>
+      </div>
+
+      <div>
+        <div className="settings-sub-title">Mot de passe</div>
+        <p style={{ fontSize: 13, color: 'var(--pencil)', margin: '0 0 12px' }}>
+          Recevez un lien par email pour définir un nouveau mot de passe.
+        </p>
+        <button
+          className="dash-btn-ghost"
+          onClick={handlePasswordReset}
+          disabled={sending}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+        >
+          {sending ? 'Envoi…' : 'Changer le mot de passe'}
+        </button>
+        {success && <div className="dash-success-msg" style={{ marginTop: 12 }} role="status">{success}</div>}
+        {error   && <div className="dash-error" style={{ marginTop: 12 }} role="alert">{error}</div>}
+      </div>
+    </div>
+  )
+}
+
+// ─── DangerSection ────────────────────────────────────────────────────────────
+
 function DangerSection({ workspaceId }: { workspaceId: string }) {
-  const [confirm, setConfirm] = useState(false)
+  const [confirm, setConfirm]   = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [error, setError]     = useState<string|null>(null)
+  const [error, setError]       = useState<string | null>(null)
 
   async function handleDelete() {
     setDeleting(true); setError(null)
@@ -439,33 +942,43 @@ function DangerSection({ workspaceId }: { workspaceId: string }) {
   }
 
   return (
-    <div className="dash-card dash-danger-zone">
-      <div className="dash-card-title dash-danger-title">Zone de danger</div>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:16 }}>
-        <div>
-          <p style={{ fontWeight:600, margin:'0 0 4px', color:'var(--ink)' }}>Supprimer le workspace</p>
-          <p style={{ fontSize:13, color:'var(--pencil)', margin:0, maxWidth:480 }}>
-            Cette action supprimera définitivement toutes les données : factures, dépenses, transactions et membres. Elle est irréversible.
-          </p>
-        </div>
-        <button className="dash-btn-danger" onClick={()=>setConfirm(true)} type="button">Supprimer</button>
+    <div>
+      <div className="settings-section-header">
+        <h2 className="settings-section-title" style={{ color: '#dc2626' }}>Zone de danger</h2>
+        <p className="settings-section-desc">Actions irréversibles sur votre workspace</p>
       </div>
-      {error && !confirm && <div className="dash-error" style={{ marginTop:12 }}>{error}</div>}
+
+      <div style={{ border: '1.5px solid #dc2626', padding: 24, boxShadow: '3px 3px 0 #dc2626' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <p style={{ fontWeight: 600, margin: '0 0 6px', color: 'var(--ink)', fontSize: 14 }}>Supprimer le workspace</p>
+            <p style={{ fontSize: 13, color: 'var(--pencil)', margin: 0, maxWidth: 480, lineHeight: 1.6 }}>
+              Cette action supprimera définitivement toutes les données : factures, dépenses, transactions et membres.
+              Elle est <strong>irréversible</strong>.
+            </p>
+          </div>
+          <button className="dash-btn-danger" onClick={() => setConfirm(true)} type="button">
+            Supprimer
+          </button>
+        </div>
+        {error && !confirm && <div className="dash-error" style={{ marginTop: 12 }} role="alert">{error}</div>}
+      </div>
+
       {confirm && (
-        <div className="dash-modal-backdrop" onClick={()=>setConfirm(false)}>
-          <div className="dash-modal" style={{ maxWidth:400 }} onClick={e=>e.stopPropagation()}>
+        <div className="dash-modal-backdrop" onClick={() => !deleting && setConfirm(false)}>
+          <div className="dash-modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
             <div className="dash-modal-header">
-              <h2 className="dash-modal-title" style={{ color:'#dc2626' }}>Supprimer le workspace</h2>
-              <button className="dash-modal-close" aria-label="Fermer" onClick={()=>setConfirm(false)}>×</button>
+              <h2 className="dash-modal-title" style={{ color: '#dc2626' }}>Supprimer le workspace</h2>
+              <button className="dash-modal-close" aria-label="Fermer" onClick={() => setConfirm(false)}>×</button>
             </div>
             <div className="dash-modal-body">
-              <p style={{ fontSize:14, color:'var(--pencil)' }}>
+              <p style={{ fontSize: 14, color: 'var(--pencil)', margin: 0 }}>
                 Cette action est <strong>irréversible</strong>. Toutes les données du workspace seront définitivement supprimées.
               </p>
               {error && <div className="dash-error" role="alert">{error}</div>}
             </div>
             <div className="dash-modal-footer">
-              <button className="dash-btn-ghost" onClick={()=>setConfirm(false)} disabled={deleting}>Annuler</button>
+              <button className="dash-btn-ghost" onClick={() => setConfirm(false)} disabled={deleting}>Annuler</button>
               <button className="dash-btn-danger" onClick={handleDelete} disabled={deleting}>
                 {deleting ? 'Suppression…' : 'Oui, supprimer définitivement'}
               </button>

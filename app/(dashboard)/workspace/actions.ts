@@ -50,7 +50,8 @@ async function buildInviteUrl(token: string, workspaceId: string, supabase: Awai
 }
 
 export async function createInvitation(
-  email: string
+  email: string,
+  role: 'admin' | 'member' = 'member'
 ): Promise<{ error?: string; inviteUrl?: string }> {
   if (!EMAIL_RE.test(email)) return { error: 'Adresse email invalide.' }
 
@@ -77,7 +78,7 @@ export async function createInvitation(
   const { error: insertError } = await supabase.from('invitations').insert({
     workspace_id: ctx.workspaceId,
     email: email.toLowerCase(),
-    role: 'member',
+    role,
     token,
     invited_by: ctx.userId,
     expires_at,
@@ -172,6 +173,69 @@ export async function resendInvitation(id: string): Promise<{ error?: string; in
   sendInvitationEmail(inv.email, wsName, inviteUrl).catch(() => {})
 
   return { inviteUrl }
+}
+
+export async function updateMemberRole(
+  memberId: string,
+  newRole: 'admin' | 'member'
+): Promise<{ error?: string }> {
+  const ctx = await getWorkspaceCtx()
+  if (!ctx) return { error: 'Session expirée.' }
+  if (ctx.role === 'member') return { error: 'Droits insuffisants.' }
+
+  const supabase = await createClient()
+
+  // Fetch target membership
+  const { data: target } = await supabase
+    .from('memberships')
+    .select('id, user_id, role')
+    .eq('id', memberId)
+    .eq('workspace_id', ctx.workspaceId)
+    .maybeSingle()
+
+  if (!target) return { error: 'Membre introuvable.' }
+  if (target.role === 'owner') return { error: "Impossible de modifier le rôle du propriétaire." }
+  if (target.user_id === ctx.userId) return { error: 'Vous ne pouvez pas modifier votre propre rôle.' }
+  if (ctx.role === 'admin' && target.role === 'admin') return { error: "Un administrateur ne peut pas modifier le rôle d'un autre administrateur." }
+
+  const { error } = await supabase
+    .from('memberships')
+    .update({ role: newRole })
+    .eq('id', memberId)
+    .eq('workspace_id', ctx.workspaceId)
+
+  if (error) return { error: error.message }
+  return {}
+}
+
+export async function removeMember(memberId: string): Promise<{ error?: string }> {
+  const ctx = await getWorkspaceCtx()
+  if (!ctx) return { error: 'Session expirée.' }
+  if (ctx.role === 'member') return { error: 'Droits insuffisants.' }
+
+  const supabase = await createClient()
+
+  // Fetch target membership
+  const { data: target } = await supabase
+    .from('memberships')
+    .select('id, user_id, role')
+    .eq('id', memberId)
+    .eq('workspace_id', ctx.workspaceId)
+    .maybeSingle()
+
+  if (!target) return { error: 'Membre introuvable.' }
+  if (target.role === 'owner') return { error: 'Impossible de retirer le propriétaire du workspace.' }
+  if (target.user_id === ctx.userId) return { error: 'Vous ne pouvez pas vous retirer vous-même.' }
+  if (ctx.role === 'admin' && target.role === 'admin') return { error: "Un administrateur ne peut pas retirer un autre administrateur." }
+
+  const { error } = await supabase
+    .from('memberships')
+    .delete()
+    .eq('id', memberId)
+    .eq('workspace_id', ctx.workspaceId)
+
+  if (error) return { error: error.message }
+  return {}
 }
 
 export async function listMembersWithEmail(): Promise<{ data?: MemberRow[]; error?: string }> {
