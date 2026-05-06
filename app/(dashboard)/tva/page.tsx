@@ -447,6 +447,9 @@ export default function TVAPage() {
           <h1 className="dash-title">TVA</h1>
           <p className="dash-subtitle">Déclaration conforme CA3 (art. 287 CGI)</p>
         </div>
+        <button className="dash-btn-ghost no-print" onClick={() => window.print()}>
+          ↓ Imprimer / PDF
+        </button>
         <div className="dash-period-picker">
           <div className="dash-period-mode-row">
             {Object.keys(MODE_LABELS).map(m => (

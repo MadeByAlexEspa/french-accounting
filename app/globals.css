@@ -1458,6 +1458,10 @@ body {
   .sb-wrapper, .sb-sidebar, .sb-topbar, .sb-main, .sb-content { all: unset !important; display: block !important; }
   .print-invoice { border: none; margin: 0; padding: 24px; max-width: 100%; box-shadow: none; }
   body { background: white; }
+
+  /* TVA print */
+  .dash-tabs, .dash-filter-bar, .dash-section-title .dash-section-count { display: none !important; }
+  .dash-section { page-break-inside: avoid; }
 }
 
 /* ── Dashboard Alerts ── */

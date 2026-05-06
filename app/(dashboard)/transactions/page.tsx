@@ -876,6 +876,32 @@ export default function TransactionsPage() {
     setSelectedIds(s => { const n = new Set(s); allSelected ? allKeys.forEach(k => n.delete(k)) : allKeys.forEach(k => n.add(k)); return n })
   }
 
+  // ── Period presets ─────────────────────────────────────────────────────────
+
+  function applyPeriodPreset(preset: 'month' | 'quarter' | 'semester' | 'year') {
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = now.getMonth() // 0-based
+    let from = '', to = ''
+    if (preset === 'month') {
+      from = `${y}-${String(m + 1).padStart(2, '0')}-01`
+      to = new Date(y, m + 1, 0).toISOString().slice(0, 10)
+    } else if (preset === 'quarter') {
+      const q = Math.floor(m / 3)
+      from = `${y}-${String(q * 3 + 1).padStart(2, '0')}-01`
+      to = new Date(y, q * 3 + 3, 0).toISOString().slice(0, 10)
+    } else if (preset === 'semester') {
+      from = m < 6 ? `${y}-01-01` : `${y}-07-01`
+      to   = m < 6 ? `${y}-06-30` : `${y}-12-31`
+    } else {
+      from = `${y}-01-01`
+      to   = `${y}-12-31`
+    }
+    setFilterDateFrom(from)
+    setFilterDateTo(to)
+    setPage(1)
+  }
+
   // ── Row render ─────────────────────────────────────────────────────────────
 
   function renderRow(row: AnyRow) {
@@ -994,6 +1020,45 @@ export default function TransactionsPage() {
             </span>
           </button>
         ))}
+      </div>
+
+      {/* Period presets */}
+      <div className="no-print" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+        {([
+          { label: 'Ce mois',      preset: 'month'    },
+          { label: 'Ce trimestre', preset: 'quarter'  },
+          { label: 'Ce semestre',  preset: 'semester' },
+          { label: 'Cette année',  preset: 'year'     },
+        ] as { label: string; preset: 'month' | 'quarter' | 'semester' | 'year' }[]).map(({ label, preset }) => {
+          const isActive = (() => {
+            const now = new Date()
+            const y = now.getFullYear()
+            const m = now.getMonth()
+            if (preset === 'month') return filterDateFrom === `${y}-${String(m + 1).padStart(2, '0')}-01`
+            if (preset === 'quarter') { const q = Math.floor(m / 3); return filterDateFrom === `${y}-${String(q * 3 + 1).padStart(2, '0')}-01` }
+            if (preset === 'semester') return filterDateFrom === (m < 6 ? `${y}-01-01` : `${y}-07-01`)
+            return filterDateFrom === `${y}-01-01` && filterDateTo === `${y}-12-31`
+          })()
+          return (
+            <button
+              key={preset}
+              className="dash-btn-ghost"
+              style={{ fontSize: 12, padding: '4px 10px', fontWeight: isActive ? 700 : undefined, borderColor: isActive ? 'var(--ink)' : undefined, borderWidth: isActive ? '1.5px' : undefined }}
+              onClick={() => applyPeriodPreset(preset)}
+            >
+              {label}
+            </button>
+          )
+        })}
+        {(filterDateFrom || filterDateTo) && (
+          <button
+            className="dash-btn-ghost"
+            style={{ fontSize: 12, padding: '4px 10px', color: 'var(--pencil)' }}
+            onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setPage(1) }}
+          >
+            ✕ Effacer dates
+          </button>
+        )}
       </div>
 
       <div className="dash-filter-bar">

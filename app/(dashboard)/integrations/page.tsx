@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import {
   getQontoAccounts,
   saveQontoAccount,
@@ -27,7 +28,177 @@ function formatDate(d: string | null) {
   })
 }
 
-type Tab = 'qonto' | 'shine'
+type Tab = 'qonto' | 'shine' | 'rapprochement'
+
+// ==================== RAPPROCHEMENT ====================
+
+function ReconciliationSection() {
+  const [loading, setLoading] = useState(true)
+  const [pending, setPending] = useState<Array<{
+    id: number; numero: string; date: string; client: string; montant_ttc: number
+  }>>([])
+  const [bankCredits, setBankCredits] = useState<Array<{
+    id: number; numero: string; date: string; client: string; montant_ttc: number; bank_source: string
+  }>>([])
+  const [confirmId, setConfirmId] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
+    const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
+    if (!m) { setLoading(false); return }
+
+    const [{ data: pRows }, { data: bRows }] = await Promise.all([
+      supabase.from('factures')
+        .select('id, numero, date, client, montant_ttc')
+        .eq('workspace_id', m.workspace_id)
+        .eq('statut', 'en_attente')
+        .is('bank_source', null)
+        .order('date', { ascending: false })
+        .limit(50),
+      supabase.from('factures')
+        .select('id, numero, date, client, montant_ttc, bank_source')
+        .eq('workspace_id', m.workspace_id)
+        .eq('statut', 'en_attente')
+        .in('bank_source', ['qonto', 'shine'])
+        .order('date', { ascending: false })
+        .limit(50),
+    ])
+    setPending(pRows ?? [])
+    setBankCredits(
+      (bRows ?? []).map(r => ({ ...r, bank_source: r.bank_source ?? '' }))
+    )
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function markPaid(id: number) {
+    setSaving(true); setError(null)
+    const supabase = createClient()
+    const { error: err } = await supabase.from('factures').update({ statut: 'payee' }).eq('id', id)
+    if (err) { setError(err.message); setSaving(false); return }
+    setConfirmId(null); setSaving(false); await load()
+  }
+
+  function suggestedMatch(inv: typeof pending[0]) {
+    return bankCredits.find(b => Math.abs(b.montant_ttc - inv.montant_ttc) <= 1)
+  }
+
+  if (loading) return <div className="dash-loading">Chargement…</div>
+
+  return (
+    <div>
+      <div className="dash-card" style={{ marginTop: 8 }}>
+        <p className="dash-card-title">Factures en attente de paiement</p>
+        <p style={{ fontSize: 12, color: 'var(--pencil)', marginBottom: 16 }}>
+          Ces factures ont été créées manuellement et n&apos;ont pas encore été rapprochées d&apos;un virement bancaire.
+        </p>
+
+        {error && <div className="dash-error" style={{ marginBottom: 12 }}>{error}</div>}
+
+        {pending.length === 0 ? (
+          <div className="dash-empty-state" style={{ border: 'none', padding: '32px 0' }}>
+            <span className="dash-empty-state-glyph">✓</span>
+            <p className="dash-empty-state-title">Tout est rapproché</p>
+            <p className="dash-empty-state-desc">Aucune facture manuelle en attente de paiement.</p>
+          </div>
+        ) : (
+          <div className="dash-table-wrap">
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Numéro</th>
+                  <th>Date</th>
+                  <th>Client</th>
+                  <th className="right">TTC</th>
+                  <th>Correspondance banque</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pending.map(inv => {
+                  const match = suggestedMatch(inv)
+                  return (
+                    <tr key={inv.id}>
+                      <td style={{ fontFamily: 'Courier Prime,monospace', fontSize: 12 }}>{inv.numero}</td>
+                      <td>{inv.date}</td>
+                      <td>{inv.client}</td>
+                      <td className="right" style={{ fontFamily: 'Courier Prime,monospace', fontWeight: 700 }}>
+                        {formatEur(inv.montant_ttc)}
+                      </td>
+                      <td>
+                        {match ? (
+                          <span style={{ fontSize: 12, color: '#16a34a', fontFamily: 'Courier Prime,monospace' }}>
+                            ✓ {match.bank_source} · {match.date} · {formatEur(match.montant_ttc)}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 12, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace' }}>
+                            — Aucune correspondance
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {confirmId === inv.id ? (
+                          <>
+                            <button
+                              style={{ background: '#16a34a', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 11, fontFamily: 'Courier Prime,monospace', padding: '2px 8px' }}
+                              onClick={() => markPaid(inv.id)} disabled={saving}>
+                              {saving ? '…' : 'Confirmer'}
+                            </button>{' '}
+                            <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace' }}
+                              onClick={() => setConfirmId(null)}>Annuler</button>
+                          </>
+                        ) : (
+                          <button className="dash-btn-ghost" style={{ padding: '3px 8px', fontSize: 11 }}
+                            onClick={() => setConfirmId(inv.id)}>
+                            Marquer payée
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {bankCredits.length > 0 && (
+        <div className="dash-card" style={{ marginTop: 8 }}>
+          <p className="dash-card-title">Crédits bancaires non rapprochés</p>
+          <p style={{ fontSize: 12, color: 'var(--pencil)', marginBottom: 16 }}>
+            Transactions importées depuis Qonto/Shine sans facture manuelle correspondante.
+          </p>
+          <div className="dash-table-wrap">
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Source</th><th>Date</th><th>Client / Libellé</th><th className="right">TTC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bankCredits.map(b => (
+                  <tr key={b.id}>
+                    <td><span className="dash-badge dash-badge-blue" style={{ fontSize: 10, textTransform: 'uppercase' }}>{b.bank_source}</span></td>
+                    <td>{b.date}</td>
+                    <td>{b.client}</td>
+                    <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(b.montant_ttc)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function IntegrationsPage() {
   const [tab, setTab] = useState<Tab>('qonto')
@@ -54,10 +225,17 @@ export default function IntegrationsPage() {
         >
           Shine
         </button>
+        <button
+          className={`dash-tab ${tab === 'rapprochement' ? 'dash-tab-active' : ''}`}
+          onClick={() => setTab('rapprochement')}
+        >
+          Rapprochement
+        </button>
       </div>
 
       {tab === 'qonto' && <QontoSection />}
       {tab === 'shine' && <ShineSection />}
+      {tab === 'rapprochement' && <ReconciliationSection />}
     </div>
   )
 }

@@ -406,6 +406,9 @@ export default function ExercicePage() {
           <h1 className="dash-title">Comptes annuels</h1>
           <p className="dash-subtitle">Compte de résultat & Bilan — PCG règlement ANC n°2014-03</p>
         </div>
+        <button className="dash-btn-ghost no-print" onClick={() => window.print()}>
+          ↓ Imprimer / PDF
+        </button>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input type="date" className="dash-filter-input" value={debut} onChange={e => handleDebut(e.target.value)} />
           <span style={{ color: 'var(--pencil)', fontSize: 13 }}>→</span>
@@ -413,7 +416,7 @@ export default function ExercicePage() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+      <div className="no-print" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
         {ps.map((p, i) => (
           <button key={p.label}
             className="dash-btn-ghost"
@@ -452,7 +455,7 @@ export default function ExercicePage() {
             }
           </div>
 
-          <div className="dash-tabs">
+          <div className="dash-tabs no-print">
             <button className={`dash-tab ${tab === 'resultat' ? 'dash-tab-active' : ''}`} onClick={() => handleTab('resultat')}>Compte de résultat</button>
             <button className={`dash-tab ${tab === 'bilan' ? 'dash-tab-active' : ''}`} onClick={() => handleTab('bilan')}>Bilan simplifié</button>
           </div>
