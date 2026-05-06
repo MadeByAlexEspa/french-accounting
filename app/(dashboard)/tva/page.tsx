@@ -87,6 +87,67 @@ function computePatch(field: string, newValue: string, row: TvaRow): Record<stri
   return {}
 }
 
+// ── CA3Section ────────────────────────────────────────────────────────────────
+
+function CA3Section({ data }: { data: ReturnType<typeof computeTVA>; debut: string; fin: string }) {
+  const [open, setOpen] = useState(false)
+  const [copiedCase, setCopiedCase] = useState<string | null>(null)
+
+  function copyToClipboard(caseId: string, value: number) {
+    navigator.clipboard.writeText(value.toFixed(2)).then(() => {
+      setCopiedCase(caseId)
+      setTimeout(() => setCopiedCase(null), 1500)
+    })
+  }
+
+  const rows: Array<{ id: string; label: string; value: number }> = [
+    { id: 'CA', label: 'Chiffre d\'affaires HT total',  value: data.collectee.total_base_ht },
+    { id: 'A1', label: 'Base imposable 20 %',           value: data.collectee.par_taux['20']?.base_ht ?? 0 },
+    { id: 'B1', label: 'TVA brute 20 %',                value: data.collectee.par_taux['20']?.tva ?? 0 },
+    { id: 'A2', label: 'Base imposable 10 %',           value: data.collectee.par_taux['10']?.base_ht ?? 0 },
+    { id: 'B2', label: 'TVA brute 10 %',                value: data.collectee.par_taux['10']?.tva ?? 0 },
+    { id: 'A3', label: 'Base imposable 5,5 %',          value: data.collectee.par_taux['5.5']?.base_ht ?? 0 },
+    { id: 'B3', label: 'TVA brute 5,5 %',               value: data.collectee.par_taux['5.5']?.tva ?? 0 },
+    { id: '20', label: 'TVA déductible sur achats',     value: data.deductible.total_tva },
+    { id: 'AC', label: 'TVA nette à reverser',          value: Math.max(0, data.collectee.total_tva - data.deductible.total_tva) },
+  ]
+
+  return (
+    <div className="dash-ca3-section">
+      <div className="dash-ca3-header" onClick={() => setOpen(o => !o)} role="button" aria-expanded={open}>
+        <span>{open ? '▼' : '▶'}</span>
+        <span>Récapitulatif CA3 — Prêt pour impots.gouv.fr</span>
+        <span style={{ fontSize: 10, fontFamily: 'Courier Prime, monospace', background: 'var(--ink)', color: '#fff', padding: '1px 6px', borderRadius: 2, marginLeft: 'auto' }}>BETA</span>
+      </div>
+      {open && (
+        <div className="dash-ca3-body">
+          {rows.map(row => (
+            <div key={row.id} className="dash-ca3-row">
+              <span className="dash-ca3-case">{row.id}</span>
+              <span className="dash-ca3-label">{row.label}</span>
+              <span className="dash-ca3-amount">{formatEur(row.value)}</span>
+              <button
+                type="button"
+                className="dash-ca3-copy"
+                aria-label={`Copier la case ${row.id}`}
+                onClick={() => copyToClipboard(row.id, row.value)}
+              >
+                {copiedCase === row.id ? '✓' : '📋'}
+              </button>
+            </div>
+          ))}
+          <div className="dash-ca3-footer">
+            <a href="https://cfspro.impots.gouv.fr" target="_blank" rel="noopener noreferrer">
+              Déclarer sur impots.gouv.fr →
+            </a>
+            <p style={{ margin: 0 }}>Transmission manuelle — Compte-Pote n&apos;est pas connecté à la DGFiP.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── TauxTable (ventilation summary) ──────────────────────────────────────────
 
 function TauxTable({ par_taux }: { par_taux: Record<string, { base_ht: number; tva: number }> }) {
@@ -663,6 +724,8 @@ export default function TVAPage() {
                 </table></div>
               )}
           </div>
+
+          <CA3Section data={data} debut={debut} fin={fin} />
         </>
       )}
 

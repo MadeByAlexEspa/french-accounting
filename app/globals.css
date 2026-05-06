@@ -1477,4 +1477,81 @@ body {
 .dash-alert-body { flex: 1; }
 .dash-alert-title { font-family: 'Special Elite', cursive; font-size: 15px; color: var(--ink); margin: 0 0 2px; }
 .dash-alert-desc { font-size: 12px; color: var(--pencil); margin: 0; line-height: 1.5; }
+
+/* ── CA3 Section ── */
+.dash-ca3-section {
+  margin-top: 24px;
+  border: 1.5px solid var(--ink);
+}
+.dash-ca3-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  background: var(--offwhite);
+  font-family: 'Courier Prime', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+.dash-ca3-body {
+  padding: 16px;
+  border-top: 1.5px solid var(--ink);
+}
+.dash-ca3-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+}
+.dash-ca3-row:last-child { border-bottom: none; }
+.dash-ca3-case {
+  font-family: 'Courier Prime', monospace;
+  font-size: 11px;
+  background: var(--offwhite);
+  border: 1px solid var(--rule);
+  padding: 2px 8px;
+  min-width: 36px;
+  text-align: center;
+}
+.dash-ca3-label { flex: 1; color: var(--pencil); }
+.dash-ca3-amount {
+  font-family: 'Courier Prime', monospace;
+  font-weight: 700;
+  min-width: 120px;
+  text-align: right;
+}
+.dash-ca3-copy {
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--pencil);
+}
+.dash-ca3-copy:hover { border-color: var(--ink); color: var(--ink); }
+.dash-ca3-footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 11px;
+  color: var(--pencil);
+}
+.dash-ca3-footer a {
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink);
+}
 .dash-alert-action { font-family: 'Courier Prime', monospace; font-size: 11px; color: var(--ink); text-decoration: underline; white-space: nowrap; align-self: center; }

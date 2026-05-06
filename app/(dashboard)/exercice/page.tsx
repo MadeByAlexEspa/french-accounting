@@ -406,6 +406,12 @@ export default function ExercicePage() {
           <h1 className="dash-title">Comptes annuels</h1>
           <p className="dash-subtitle">Compte de résultat & Bilan — PCG règlement ANC n°2014-03</p>
         </div>
+        <button
+          className="dash-btn-ghost no-print"
+          onClick={() => { window.location.href = '/api/fec/' + debut.slice(0, 4) }}
+        >
+          ↓ FEC
+        </button>
         <button className="dash-btn-ghost no-print" onClick={() => window.print()}>
           ↓ Imprimer / PDF
         </button>

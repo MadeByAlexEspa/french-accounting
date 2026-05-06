@@ -50,7 +50,18 @@ export default async function ImprimerFacture({ params }: { params: Promise<{ id
       <div className="print-actions no-print">
         <a href="/transactions" className="print-actions-back">← Retour</a>
         <PrintButton />
+        <a
+          href={`/api/facture/${facture.id}/facturx`}
+          download
+          className="dash-btn-ghost no-print"
+          style={{ fontSize: 13, textDecoration: 'none' }}
+        >
+          ↓ XML Factur-X
+        </a>
       </div>
+      <p className="no-print" style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: 'var(--pencil)', marginTop: 4, textAlign: 'center' }}>
+        Format Factur-X EN16931 — à transmettre via votre PDP ou le PPF (impots.gouv.fr)
+      </p>
 
       {/* Invoice — A4 layout */}
       <div className="print-invoice">
