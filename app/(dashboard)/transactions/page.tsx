@@ -679,6 +679,20 @@ export default function TransactionsPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return
+      const el = e.target as HTMLElement
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable) return
+      e.preventDefault()
+      if (tab === 'tous') setTab('entrees')
+      setEditFact(null); setEditDep(null); setShowForm(true); setActionError(null)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [tab])
+
   useEffect(() => { setPage(1) }, [filterTiers, filterDateFrom, filterDateTo, filterCategorie, filterStatut, tab])
   useEffect(() => {
     try { localStorage.setItem(LS_TXN, JSON.stringify({ tab, filterTiers, filterDateFrom, filterDateTo, filterCategorie, filterStatut })) } catch { /* ignore */ }
@@ -775,15 +789,16 @@ export default function TransactionsPage() {
   async function handleBulkDelete() {
     setBulkDeleting(true); setActionError(null)
     const supabase = createClient()
-    const errs: string[] = []
-    for (const key of selectedIds) {
-      try {
-        if (key.startsWith('entree-')) await supabase.from('factures').delete().eq('id', parseInt(key.slice(7)))
-        else await supabase.from('depenses').delete().eq('id', parseInt(key.slice(7)))
-      } catch (e: unknown) { errs.push(e instanceof Error ? e.message : key) }
-    }
+    const results = await Promise.allSettled(
+      [...selectedIds].map(key =>
+        key.startsWith('entree-')
+          ? supabase.from('factures').delete().eq('id', parseInt(key.slice(7)))
+          : supabase.from('depenses').delete().eq('id', parseInt(key.slice(7)))
+      )
+    )
+    const failed = results.filter(r => r.status === 'rejected').length
     setSelectedIds(new Set()); setConfirmBulkDelete(false); setBulkDeleting(false)
-    if (errs.length) setActionError(`${errs.length} suppression(s) ont échoué.`)
+    if (failed) setActionError(`${failed} suppression(s) ont échoué.`)
     await load()
   }
 
@@ -895,9 +910,12 @@ export default function TransactionsPage() {
           <p className="dash-subtitle">{factures.length} entrée{factures.length !== 1 ? 's' : ''} · {depenses.length} sortie{depenses.length !== 1 ? 's' : ''}</p>
         </div>
         {tab !== 'tous' && (
-          <button className="dash-btn" onClick={() => { setEditFact(null); setEditDep(null); setShowForm(true); setActionError(null) }}>
-            {isEntrees ? '+ Nouvelle entrée' : '+ Nouvelle sortie'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="dash-btn" onClick={() => { setEditFact(null); setEditDep(null); setShowForm(true); setActionError(null) }}>
+              {isEntrees ? '+ Nouvelle entrée' : '+ Nouvelle sortie'}
+            </button>
+            <span className="dash-kbd" title="Raccourci clavier">n</span>
+          </div>
         )}
       </div>
 
@@ -927,7 +945,7 @@ export default function TransactionsPage() {
           <option value="payee">Payée</option>
           <option value="en_attente">En attente</option>
         </select>
-        {hasFilters && <button className="dash-btn-ghost" onClick={() => { setFilterTiers(''); setFilterDateFrom(''); setFilterDateTo(''); setFilterCategorie(''); setFilterStatut('') }}>× Effacer</button>}
+        {hasFilters && <button className="dash-btn-ghost" onClick={() => { setFilterTiers(''); setFilterDateFrom(''); setFilterDateTo(''); setFilterCategorie(''); setFilterStatut('') }} title="Effacer tous les filtres">×</button>}
       </div>
 
       {actionError && <div className="dash-error" style={{ marginBottom: 12 }}>⚠️ {actionError}</div>}
@@ -940,7 +958,23 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      {loading && <div className="dash-loading">Chargement…</div>}
+      {loading && (
+        <div className="dash-table-wrap">
+          <table className="dash-table">
+            <tbody>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: tab === 'tous' ? 11 : 10 }).map((_, j) => (
+                    <td key={j}>
+                      <span className="dash-skeleton-line" style={{ width: `${50 + (j * 19 + i * 31) % 45}%`, height: 13 }} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {error && <div className="dash-error">{error}</div>}
 
       {!loading && (
@@ -953,32 +987,57 @@ export default function TransactionsPage() {
                 : `${baseRows.length} transaction${baseRows.length > 1 ? 's' : ''} — page ${safePage} / ${totalPages}`}
           </div>
 
-          <div className="dash-table-wrap">
-            <table className="dash-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 32 }}>
-                    <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} title="Tout sélectionner" />
-                  </th>
-                  {tab === 'tous' && <th>Type</th>}
-                  <th>Date</th>
-                  <th>Tiers</th>
-                  <th className="right">HT</th>
-                  <th className="center">TVA</th>
-                  <th className="right">TTC</th>
-                  <th>Catégorie</th>
-                  <th>Statut</th>
-                  <th className="center">📎</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.length === 0
-                  ? <tr><td colSpan={tab === 'tous' ? 11 : 10} className="dash-empty">Aucune transaction.</td></tr>
-                  : pageRows.map(row => renderRow(row))
-                }
-              </tbody>
-              {pageRows.length > 0 && (
+          {pageRows.length === 0 && !hasFilters ? (
+            <div className="dash-empty-state">
+              <div className="dash-empty-state-glyph">✎</div>
+              <p className="dash-empty-state-title">
+                {tab === 'entrees' ? "Aucune entrée pour l’instant"
+                  : tab === 'sorties' ? "Aucune sortie pour l’instant"
+                  : "Aucune transaction pour l’instant"}
+              </p>
+              <p className="dash-empty-state-desc">
+                {tab === 'entrees' ? "Enregistrez votre première facture client pour commencer à suivre votre chiffre d’affaires."
+                  : tab === 'sorties' ? "Enregistrez votre première dépense pour suivre vos charges."
+                  : "Passez sur l’onglet Entrées ou Sorties pour créer votre première transaction."}
+              </p>
+              {tab !== 'tous' && (
+                <button className="dash-btn" onClick={() => { setEditFact(null); setEditDep(null); setShowForm(true); setActionError(null) }}>
+                  {tab === 'entrees' ? '+ Nouvelle entrée' : '+ Nouvelle sortie'}
+                </button>
+              )}
+            </div>
+          ) : pageRows.length === 0 && hasFilters ? (
+            <div className="dash-empty-state">
+              <div className="dash-empty-state-glyph">◎</div>
+              <p className="dash-empty-state-title">Aucun résultat</p>
+              <p className="dash-empty-state-desc">Aucune transaction ne correspond aux filtres actifs.</p>
+              <button className="dash-btn-ghost" onClick={() => { setFilterTiers(''); setFilterDateFrom(''); setFilterDateTo(''); setFilterCategorie(''); setFilterStatut('') }}>
+                × Effacer les filtres
+              </button>
+            </div>
+          ) : (
+            <div className="dash-table-wrap">
+              <table className="dash-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 32 }}>
+                      <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} title="Tout sélectionner" />
+                    </th>
+                    {tab === 'tous' && <th>Type</th>}
+                    <th>Date</th>
+                    <th>Tiers</th>
+                    <th className="right">HT</th>
+                    <th className="center">TVA</th>
+                    <th className="right">TTC</th>
+                    <th>Catégorie</th>
+                    <th>Statut</th>
+                    <th className="center">📎</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map(row => renderRow(row))}
+                </tbody>
                 <tfoot>
                   <tr>
                     <td colSpan={tab === 'tous' ? 4 : 3}><strong>Total ({filtered.length})</strong></td>
@@ -988,9 +1047,9 @@ export default function TransactionsPage() {
                     <td colSpan={4} />
                   </tr>
                 </tfoot>
-              )}
-            </table>
-          </div>
+              </table>
+            </div>
+          )}
 
           <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
         </>

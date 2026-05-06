@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Workspace } from '@/lib/types/database'
 
 const NAV_MAIN = [
+  { href: '/',               label: 'Accueil' },
   { href: '/transactions',   label: 'Transactions' },
   { href: '/tva',            label: 'TVA' },
   { href: '/exercice',       label: 'Comptes annuels' },
@@ -45,7 +46,10 @@ export default function Sidebar({ workspace, userEmail }: Props) {
     router.refresh()
   }
 
-  function isActive(href: string) { return pathname.startsWith(href) }
+  function isActive(href: string) {
+    if (href === '/') return pathname === '/'
+    return pathname.startsWith(href)
+  }
 
   const navContent = (
     <>
