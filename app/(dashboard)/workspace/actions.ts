@@ -128,10 +128,9 @@ export async function cancelInvitation(id: string): Promise<{ error?: string }> 
     .delete({ count: 'exact' })
     .eq('id', id)
     .eq('workspace_id', ctx.workspaceId)
-    .is('used_at', null)
 
   if (error) return { error: error.message }
-  if (!count || count === 0) return { error: 'Invitation introuvable ou déjà utilisée.' }
+  if (!count || count === 0) return { error: 'Invitation introuvable.' }
   return {}
 }
 

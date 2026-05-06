@@ -799,14 +799,14 @@ function EquipeSection({
                     </button>
                   )}
 
-                  {isPending && currentUserRole !== 'member' && (
+                  {currentUserRole !== 'member' && (
                     <button
                       className="dash-btn-ghost"
                       style={{ fontSize: 11, padding: '4px 10px', color: '#dc2626' }}
                       onClick={() => setCancelConfirmId(inv.id)}
-                      aria-label={`Annuler l'invitation de ${inv.email}`}
+                      aria-label={isPending ? `Annuler l'invitation de ${inv.email}` : `Supprimer l'invitation de ${inv.email}`}
                     >
-                      Annuler
+                      {isPending ? 'Annuler' : 'Supprimer'}
                     </button>
                   )}
                 </div>
@@ -841,27 +841,33 @@ function EquipeSection({
       )}
 
       {/* Cancel invitation confirmation modal */}
-      {cancelConfirmId && (
-        <div className="dash-modal-backdrop" onClick={() => !cancelling && setCancelConfirmId(null)}>
-          <div className="dash-modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-            <div className="dash-modal-header">
-              <h2 className="dash-modal-title">Annuler l&apos;invitation</h2>
-              <button className="dash-modal-close" aria-label="Fermer" onClick={() => setCancelConfirmId(null)}>×</button>
-            </div>
-            <div className="dash-modal-body">
-              <p style={{ fontSize: 14, color: 'var(--pencil)', margin: 0 }}>
-                Le lien d&apos;invitation sera invalidé. Vous pourrez envoyer une nouvelle invitation si nécessaire.
-              </p>
-            </div>
-            <div className="dash-modal-footer">
-              <button className="dash-btn-ghost" onClick={() => setCancelConfirmId(null)} disabled={cancelling}>Fermer</button>
-              <button className="dash-btn-danger" onClick={handleCancelConfirmed} disabled={cancelling}>
-                {cancelling ? 'Annulation…' : "Annuler l'invitation"}
-              </button>
+      {cancelConfirmId && (() => {
+        const target = invitations.find(i => i.id === cancelConfirmId)
+        const isPendingTarget = target && !target.used_at && new Date(target.expires_at) >= new Date()
+        return (
+          <div className="dash-modal-backdrop" onClick={() => !cancelling && setCancelConfirmId(null)}>
+            <div className="dash-modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+              <div className="dash-modal-header">
+                <h2 className="dash-modal-title">{isPendingTarget ? "Annuler l'invitation" : "Supprimer l'invitation"}</h2>
+                <button className="dash-modal-close" aria-label="Fermer" onClick={() => setCancelConfirmId(null)}>×</button>
+              </div>
+              <div className="dash-modal-body">
+                <p style={{ fontSize: 14, color: 'var(--pencil)', margin: 0 }}>
+                  {isPendingTarget
+                    ? "Le lien d'invitation sera invalidé. Vous pourrez envoyer une nouvelle invitation si nécessaire."
+                    : "Cette invitation sera supprimée de l'historique."}
+                </p>
+              </div>
+              <div className="dash-modal-footer">
+                <button className="dash-btn-ghost" onClick={() => setCancelConfirmId(null)} disabled={cancelling}>Fermer</button>
+                <button className="dash-btn-danger" onClick={handleCancelConfirmed} disabled={cancelling}>
+                  {cancelling ? '…' : isPendingTarget ? "Annuler l'invitation" : 'Supprimer'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

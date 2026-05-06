@@ -15,7 +15,7 @@ const NAV_MAIN = [
 
 const NAV_FOOTER = [
   { href: '/integrations', label: 'Connexions API' },
-  { href: '/workspace',    label: 'Workspace' },
+  { href: '/workspace',    label: 'Paramètres' },
 ]
 
 interface Props {
