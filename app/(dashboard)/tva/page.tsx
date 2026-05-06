@@ -90,7 +90,7 @@ function computePatch(field: string, newValue: string, row: TvaRow): Record<stri
 // ── CA3Section ────────────────────────────────────────────────────────────────
 
 function CA3Section({ data }: { data: ReturnType<typeof computeTVA>; debut: string; fin: string }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const [copiedCase, setCopiedCase] = useState<string | null>(null)
 
   function copyToClipboard(caseId: string, value: number) {
