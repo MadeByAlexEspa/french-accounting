@@ -806,6 +806,145 @@ body {
 .dash-danger-zone { border-color: #dc2626; box-shadow: 3px 3px 0 #dc2626; }
 .dash-danger-title { color: #dc2626; }
 
+/* ─── Invite Modal ─── */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.invite-modal {
+  background: #fff;
+  border: 1.5px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink);
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+}
+.invite-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 24px 24px 20px;
+  border-bottom: 1.5px solid var(--rule);
+}
+.invite-modal-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.invite-modal-title {
+  font-family: 'Special Elite', cursive;
+  font-size: 20px;
+  color: var(--ink);
+  margin: 0 0 3px;
+}
+.invite-modal-subtitle {
+  font-size: 13px;
+  color: var(--pencil);
+  margin: 0;
+  line-height: 1.5;
+}
+.invite-modal-header .dash-modal-close {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+.invite-modal-body { padding: 24px; }
+.invite-modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 16px 24px;
+  border-top: 1.5px solid var(--rule);
+  background: var(--offwhite);
+}
+
+/* Role picker */
+.invite-role-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+.invite-role-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--rule);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+.invite-role-option:hover { border-color: var(--pencil); background: var(--offwhite); }
+.invite-role-option-active { border-color: var(--ink); background: var(--ink); }
+.invite-role-option-name {
+  font-family: 'Courier Prime', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  transition: color 0.15s;
+}
+.invite-role-option-active .invite-role-option-name { color: var(--paper); }
+.invite-role-option-desc {
+  font-size: 11px;
+  color: var(--pencil);
+  line-height: 1.4;
+  transition: color 0.15s;
+}
+.invite-role-option-active .invite-role-option-desc { color: rgba(250,250,248,0.7); }
+
+/* Success state */
+.invite-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  text-align: center;
+}
+.invite-success-icon {
+  width: 48px;
+  height: 48px;
+  background: #dcfce7;
+  border: 1.5px solid #16a34a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #16a34a;
+}
+.invite-success-label { font-size: 14px; color: var(--ink); margin: 0; }
+.invite-success-hint { font-size: 12px; color: var(--pencil); margin: 0; font-family: 'Courier Prime', monospace; }
+.invite-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--offwhite);
+  border: 1px solid var(--rule);
+}
+.invite-link-text {
+  font-family: 'Courier Prime', monospace;
+  font-size: 11px;
+  color: var(--pencil);
+  word-break: break-all;
+  flex: 1;
+  text-align: left;
+}
+
 /* ─── Settings Layout ─── */
 .settings-layout {
   display: grid;

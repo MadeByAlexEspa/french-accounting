@@ -468,9 +468,9 @@ function EquipeSection({
 }) {
   const [members, setMembers]             = useState<MemberRow[]>(ws.members)
   const [invitations, setInvitations]     = useState<InvitationRow[]>([])
-  const [showInviteForm, setShowInviteForm] = useState(false)
-  const [inviteEmail, setInviteEmail]     = useState('')
-  const [inviteRole, setInviteRole]       = useState<'admin' | 'member'>('member')
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteEmail, setInviteEmail]       = useState('')
+  const [inviteRole, setInviteRole]         = useState<'admin' | 'member'>('member')
   const [inviting, setInviting]           = useState(false)
   const [inviteError, setInviteError]     = useState<string | null>(null)
   const [generatedUrl, setGeneratedUrl]   = useState<string | null>(null)
@@ -514,10 +514,7 @@ function EquipeSection({
     setInviteRole('member')
     loadInvitations()
     onChanged()
-
-    // Auto-hide the generated URL after 10 seconds
-    const t = setTimeout(() => setGeneratedUrl(null), 10000)
-    setUrlExpiry(t)
+    // Keep modal open to show the generated link — user closes manually
   }
 
   async function handleCopy(text: string, id: string) {
@@ -601,7 +598,7 @@ function EquipeSection({
           {currentUserRole !== 'member' && (
             <button
               className="dash-btn"
-              onClick={() => { setShowInviteForm(v => !v); setGeneratedUrl(null); setInviteError(null) }}
+              onClick={() => { setShowInviteModal(true); setGeneratedUrl(null); setInviteError(null) }}
             >
               <Send size={14} aria-hidden="true" />
               Inviter
@@ -610,56 +607,150 @@ function EquipeSection({
         </div>
       </div>
 
-      {/* Invite form */}
-      {showInviteForm && (
-        <div className="invite-form-wrap">
-          <div className="settings-sub-title">Nouvelle invitation</div>
-          <form onSubmit={handleInvite} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div className="dash-field" style={{ flex: 1, minWidth: 200, margin: 0 }}>
-              <label className="dash-field-label" htmlFor="invite-email">Adresse email</label>
-              <input
-                id="invite-email"
-                type="email"
-                className="dash-field-input"
-                placeholder="collegue@exemple.com"
-                value={inviteEmail}
-                onChange={e => { setInviteEmail(e.target.value); setInviteError(null); setGeneratedUrl(null) }}
-                required
-                autoFocus
-              />
-            </div>
-            <div className="dash-field" style={{ minWidth: 140, margin: 0 }}>
-              <label className="dash-field-label" htmlFor="invite-role">Rôle</label>
-              <select
-                id="invite-role"
-                className="dash-field-select"
-                value={inviteRole}
-                onChange={e => setInviteRole(e.target.value as 'admin' | 'member')}
-              >
-                <option value="member">Membre</option>
-                <option value="admin">Administrateur</option>
-              </select>
-            </div>
-            <button type="submit" className="dash-btn" disabled={inviting} style={{ marginBottom: 0 }}>
-              {inviting ? 'Envoi…' : 'Envoyer'}
-            </button>
-          </form>
-          {inviteError && <div className="dash-error" style={{ marginTop: 10 }} role="alert">{inviteError}</div>}
-          {generatedUrl && (
-            <div style={{ marginTop: 12, padding: 12, background: '#fff', border: '1px solid var(--rule)', borderRadius: 2, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: 'Courier Prime,monospace', fontSize: 12, color: 'var(--pencil)', wordBreak: 'break-all', flex: 1 }}>
-                {generatedUrl}
-              </span>
+      {/* Invite modal */}
+      {showInviteModal && (
+        <div
+          className="dash-modal-backdrop"
+          onClick={() => { if (!inviting) { setShowInviteModal(false); setGeneratedUrl(null); setInviteError(null) } }}
+        >
+          <div className="invite-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="invite-modal-title">
+
+            {/* Header */}
+            <div className="invite-modal-header">
+              <div className="invite-modal-icon" aria-hidden="true">
+                <Send size={18} />
+              </div>
+              <div>
+                <h2 id="invite-modal-title" className="invite-modal-title">Inviter un membre</h2>
+                <p className="invite-modal-subtitle">Un lien d&apos;accès valable 48h sera envoyé par email.</p>
+              </div>
               <button
-                className="dash-btn-ghost"
-                style={{ flexShrink: 0, fontSize: 12, padding: '5px 12px' }}
-                onClick={() => handleCopy(generatedUrl, 'new')}
-                aria-label="Copier le lien d'invitation"
+                className="dash-modal-close"
+                aria-label="Fermer"
+                onClick={() => { setShowInviteModal(false); setGeneratedUrl(null); setInviteError(null) }}
               >
-                {copiedId === 'new' ? <><Check size={13} /> Copié</> : <><Copy size={13} /> Copier</>}
+                <X size={16} />
               </button>
             </div>
-          )}
+
+            {/* Body */}
+            <div className="invite-modal-body">
+              {!generatedUrl ? (
+                <form id="invite-form" onSubmit={handleInvite}>
+                  <div className="dash-field" style={{ marginBottom: 16 }}>
+                    <label className="dash-field-label" htmlFor="invite-email">Adresse email</label>
+                    <input
+                      id="invite-email"
+                      type="email"
+                      className="dash-field-input"
+                      placeholder="collegue@entreprise.com"
+                      value={inviteEmail}
+                      onChange={e => { setInviteEmail(e.target.value); setInviteError(null) }}
+                      required
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="dash-field">
+                    <label className="dash-field-label">Rôle</label>
+                    <div className="invite-role-picker">
+                      {(['member', 'admin'] as const).map(r => (
+                        <label
+                          key={r}
+                          className={`invite-role-option${inviteRole === r ? ' invite-role-option-active' : ''}`}
+                        >
+                          <input
+                            type="radio"
+                            name="invite-role"
+                            value={r}
+                            checked={inviteRole === r}
+                            onChange={() => setInviteRole(r)}
+                            style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
+                          />
+                          <span className="invite-role-option-name">
+                            {r === 'member' ? 'Membre' : 'Administrateur'}
+                          </span>
+                          <span className="invite-role-option-desc">
+                            {r === 'member'
+                              ? 'Consulte et saisit des données'
+                              : 'Gère les membres et paramètres'}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {inviteError && (
+                    <div className="dash-error" style={{ marginTop: 16 }} role="alert">{inviteError}</div>
+                  )}
+                </form>
+              ) : (
+                <div className="invite-success">
+                  <div className="invite-success-icon" aria-hidden="true">
+                    <Check size={22} />
+                  </div>
+                  <p className="invite-success-label">Invitation envoyée à <strong>{inviteEmail || 'votre collègue'}</strong></p>
+                  <p className="invite-success-hint">Partagez aussi ce lien directement si l&apos;email n&apos;arrive pas :</p>
+                  <div className="invite-link-row">
+                    <span className="invite-link-text">{generatedUrl}</span>
+                    <button
+                      className="dash-btn-ghost"
+                      style={{ flexShrink: 0, padding: '6px 14px', fontSize: 12 }}
+                      onClick={() => handleCopy(generatedUrl, 'new')}
+                      aria-label="Copier le lien d'invitation"
+                    >
+                      {copiedId === 'new'
+                        ? <><Check size={12} /> Copié</>
+                        : <><Copy size={12} /> Copier</>}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="invite-modal-footer">
+              {!generatedUrl ? (
+                <>
+                  <button
+                    type="button"
+                    className="dash-btn-ghost"
+                    onClick={() => { setShowInviteModal(false); setInviteError(null) }}
+                    disabled={inviting}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    form="invite-form"
+                    className="dash-btn"
+                    disabled={inviting || !inviteEmail}
+                  >
+                    {inviting
+                      ? <><RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> Envoi…</>
+                      : <><Send size={13} /> Envoyer l&apos;invitation</>}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="dash-btn-ghost"
+                    onClick={() => { setGeneratedUrl(null); setInviteEmail('') }}
+                  >
+                    Inviter un autre
+                  </button>
+                  <button
+                    type="button"
+                    className="dash-btn"
+                    onClick={() => { setShowInviteModal(false); setGeneratedUrl(null) }}
+                  >
+                    Fermer
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
