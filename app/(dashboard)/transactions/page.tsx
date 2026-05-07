@@ -974,26 +974,6 @@ export default function TransactionsPage() {
         <td className="center" style={{ fontSize: 12, color: row.has_attachment ? '#16a34a' : 'var(--pencil)' }}>
           {row.bank_source ? (row.has_attachment ? '📎' : '—') : null}
         </td>
-        <td style={{ whiteSpace: 'nowrap' }}>
-          <button className="dash-btn-ghost" style={{ padding: '3px 8px', fontSize: 11 }}
-            onClick={() => { setActionError(null); if (isEntree) { setEditFact(row as unknown as Facture); setEditDep(null) } else { setEditDep(row as unknown as Depense); setEditFact(null) }; setShowForm(true) }}>
-            Éditer
-          </button>{' '}
-          {isEntree && (
-            <button className="dash-btn-ghost" style={{ padding: '3px 8px', fontSize: 11 }}
-              onClick={() => window.open(`/transactions/imprimer/${row.id}`, '_blank')}>
-              PDF
-            </button>
-          )}{' '}
-          {isEntree && (
-            <button className="dash-btn-ghost" style={{ padding: '3px 8px', fontSize: 11 }}
-              onClick={() => { setEmailTarget({ id: row.id, client: (row as Facture & { _type: 'entree'; _key: string }).client }); setEmailInput(''); setEmailResult(null) }}>
-              ✉
-            </button>
-          )}{' '}
-          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: 11, fontFamily: 'Courier Prime,monospace' }}
-            onClick={() => setConfirmDelete(row)}>Suppr.</button>
-        </td>
       </tr>
     )
   }
@@ -1101,13 +1081,39 @@ export default function TransactionsPage() {
 
       {actionError && <div className="dash-error" style={{ marginBottom: 12 }}>⚠️ {actionError}</div>}
 
-      {selectedIds.size > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: 'var(--offwhite)', border: '1px solid var(--rule)', borderRadius: 2, marginBottom: 12, fontFamily: 'Courier Prime,monospace', fontSize: 13 }}>
-          <span>{selectedIds.size} ligne{selectedIds.size > 1 ? 's' : ''} sélectionnée{selectedIds.size > 1 ? 's' : ''}</span>
-          <button className="dash-btn-ghost" style={{ fontSize: 12 }} onClick={() => setSelectedIds(new Set())}>Désélectionner</button>
-          <button className="dash-btn-danger" style={{ fontSize: 12 }} onClick={() => setConfirmBulkDelete(true)}>Supprimer la sélection</button>
-        </div>
-      )}
+      {selectedIds.size > 0 && (() => {
+        const singleKey = selectedIds.size === 1 ? [...selectedIds][0] : null
+        const singleRow = singleKey ? (pageRows.find(r => r._key === singleKey) ?? allRows.find(r => r._key === singleKey)) : null
+        const singleIsEntree = singleRow?._type === 'entree'
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: 'var(--offwhite)', border: '1px solid var(--rule)', borderRadius: 2, marginBottom: 12, fontFamily: 'Courier Prime,monospace', fontSize: 13 }}>
+            <span>{selectedIds.size} ligne{selectedIds.size > 1 ? 's' : ''} sélectionnée{selectedIds.size > 1 ? 's' : ''}</span>
+            <button className="dash-btn-ghost" style={{ fontSize: 12 }} onClick={() => setSelectedIds(new Set())}>Désélectionner</button>
+            {singleRow && (
+              <>
+                <button className="dash-btn-ghost" style={{ fontSize: 12 }} onClick={() => {
+                  setActionError(null)
+                  if (singleIsEntree) { setEditFact(singleRow as unknown as Facture); setEditDep(null) }
+                  else { setEditDep(singleRow as unknown as Depense); setEditFact(null) }
+                  setShowForm(true)
+                }}>Éditer</button>
+                {singleIsEntree && (
+                  <button className="dash-btn-ghost" style={{ fontSize: 12 }}
+                    onClick={() => window.open(`/transactions/imprimer/${singleRow.id}`, '_blank')}>PDF</button>
+                )}
+                {singleIsEntree && (
+                  <button className="dash-btn-ghost" style={{ fontSize: 12 }}
+                    onClick={() => { setEmailTarget({ id: singleRow.id, client: (singleRow as Facture & { _type: 'entree'; _key: string }).client }); setEmailInput(''); setEmailResult(null) }}>✉</button>
+                )}
+              </>
+            )}
+            <button className="dash-btn-danger" style={{ fontSize: 12 }} onClick={() => {
+              if (singleRow) setConfirmDelete(singleRow)
+              else setConfirmBulkDelete(true)
+            }}>Supprimer{selectedIds.size > 1 ? ' la sélection' : ''}</button>
+          </div>
+        )
+      })()}
 
       {loading && (
         <div className="dash-table-wrap">
@@ -1115,7 +1121,7 @@ export default function TransactionsPage() {
             <tbody>
               {Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: tab === 'tous' ? 11 : 10 }).map((_, j) => (
+                  {Array.from({ length: tab === 'tous' ? 10 : 9 }).map((_, j) => (
                     <td key={j}>
                       <span className="dash-skeleton-line" style={{ width: `${50 + (j * 19 + i * 31) % 45}%`, height: 13 }} />
                     </td>
@@ -1183,7 +1189,6 @@ export default function TransactionsPage() {
                     <th>Catégorie</th>
                     <th>Statut</th>
                     <th className="center">📎</th>
-                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1195,7 +1200,7 @@ export default function TransactionsPage() {
                     <td className="right"><strong>{formatEur(filtered.reduce((s, r) => s + r.montant_ht, 0))}</strong></td>
                     <td />
                     <td className="right"><strong>{formatEur(filtered.reduce((s, r) => s + r.montant_ttc, 0))}</strong></td>
-                    <td colSpan={4} />
+                    <td colSpan={3} />
                   </tr>
                 </tfoot>
               </table>
