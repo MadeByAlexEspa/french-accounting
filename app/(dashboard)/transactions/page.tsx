@@ -949,8 +949,8 @@ export default function TransactionsPage() {
             display={tvaBadge} options={tvaOptions} onSave={handleCellSave}
             onSplitClick={() => setSplitTarget(row)} />
           {isTvaErronnee(row) && (
-            <span className="dash-badge dash-badge-orange" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, marginTop: 2 }}>
-              <AlertTriangle size={10} />{getTvaAlertLabel(row)}
+            <span title={getTvaAlertLabel(row)} style={{ display: 'inline-flex', alignItems: 'center', marginTop: 2, color: '#f59e0b', cursor: 'default' }}>
+              <AlertTriangle size={13} />
             </span>
           )}
         </td>

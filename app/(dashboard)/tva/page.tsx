@@ -457,8 +457,8 @@ function TvaDeductibleModal({
                           <td>
                             {row.fournisseur}
                             {erreur && (
-                              <span className="dash-badge dash-badge-orange" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, marginLeft: 8 }}>
-                                <AlertTriangle size={10} />{getTvaAlertLabel(row)}
+                              <span title={getTvaAlertLabel(row)} style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 6, color: '#f59e0b', cursor: 'default' }}>
+                                <AlertTriangle size={13} />
                               </span>
                             )}
                           </td>
@@ -603,6 +603,11 @@ export default function TVAPage() {
     return rows
   }, [data.detail_depenses, dSearch, dTaux])
 
+  const alertCount = useMemo(
+    () => [...data.detail_factures, ...data.detail_depenses].filter(isTvaErronnee).length,
+    [data.detail_factures, data.detail_depenses]
+  )
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -611,6 +616,12 @@ export default function TVAPage() {
         <div>
           <h1 className="dash-title">TVA</h1>
           <p className="dash-subtitle">Déclaration conforme CA3 (art. 287 CGI)</p>
+          {alertCount > 0 && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 6, padding: '4px 10px', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 6, fontSize: 12, color: '#92400e' }}>
+              <AlertTriangle size={12} />
+              {alertCount} transaction{alertCount > 1 ? 's' : ''} avec TVA à vérifier
+            </div>
+          )}
         </div>
         <button className="dash-btn-ghost no-print" onClick={() => window.print()}>
           ↓ Imprimer / PDF
@@ -732,8 +743,8 @@ export default function TVAPage() {
                           <td>
                             {f.client}
                             {erreur && (
-                              <span title={getTvaAlertLabel(f)} style={{ marginLeft: 6, color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'default' }}>
-                                ⚠ {getTvaAlertLabel(f)}
+                              <span title={getTvaAlertLabel(f)} style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 6, color: '#f59e0b', cursor: 'default' }}>
+                                <AlertTriangle size={13} />
                               </span>
                             )}
                           </td>
@@ -808,8 +819,8 @@ export default function TVAPage() {
                           <td>
                             {d.fournisseur}
                             {erreur && (
-                              <span title={getTvaAlertLabel(d)} style={{ marginLeft: 6, color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'default' }}>
-                                ⚠ {getTvaAlertLabel(d)}
+                              <span title={getTvaAlertLabel(d)} style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 6, color: '#f59e0b', cursor: 'default' }}>
+                                <AlertTriangle size={13} />
                               </span>
                             )}
                           </td>

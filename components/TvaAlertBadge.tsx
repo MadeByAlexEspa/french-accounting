@@ -29,7 +29,7 @@ export function TvaAlertBadge() {
     <span style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       minWidth: 18, height: 18, borderRadius: 9,
-      background: '#f59e0b', color: '#fff',
+      background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b',
       fontSize: 10, fontWeight: 700, flexShrink: 0,
       fontFamily: 'Inter, sans-serif', padding: '0 4px',
       lineHeight: 1,
