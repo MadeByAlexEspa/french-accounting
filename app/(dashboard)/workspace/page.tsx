@@ -581,8 +581,22 @@ function EquipeSection({
   return (
     <div>
       <div className="settings-section-header">
-        <h2 className="settings-section-title">Équipe</h2>
-        <p className="settings-section-desc">{members.length} membre{members.length !== 1 ? 's' : ''}</p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <h2 className="settings-section-title">Équipe</h2>
+            <p className="settings-section-desc">{members.length} membre{members.length !== 1 ? 's' : ''}</p>
+          </div>
+          {currentUserRole !== 'member' && (
+            <button
+              className="dash-btn"
+              style={{ flexShrink: 0 }}
+              onClick={() => { setShowInviteModal(true); setGeneratedUrl(null); setInviteError(null) }}
+            >
+              <Send size={14} aria-hidden="true" />
+              Inviter
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="dash-tabs" style={{ marginBottom: 20 }}>
@@ -810,18 +824,6 @@ function EquipeSection({
       {/* ── Invitations tab ─────────────────────────────────────────── */}
       {teamTab === 'invitations' && (
       <div>
-        {currentUserRole !== 'member' && (
-          <div style={{ marginBottom: 20 }}>
-            <button
-              className="dash-btn"
-              onClick={() => { setShowInviteModal(true); setGeneratedUrl(null); setInviteError(null) }}
-            >
-              <Send size={14} aria-hidden="true" />
-              Inviter un membre
-            </button>
-          </div>
-        )}
-
         {pendingInvitations.length === 0 ? (
           <p style={{ fontSize: 13, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace' }}>Aucune invitation en cours.</p>
         ) : (
