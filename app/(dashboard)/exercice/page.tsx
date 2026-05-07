@@ -518,6 +518,15 @@ export default function ExercicePage() {
   // Feature #16 — Ratios de gestion
   const [showRatios, setShowRatios] = useState(false)
 
+  // Sprint 3 — workspace id (needed for annotation persistence)
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
+
+  // Sprint 3 — Feature C: Annotation d'exercice
+  const [annotation, setAnnotation]         = useState('')
+  const [annotationSaved, setAnnotationSaved]   = useState(false)
+  const [showAnnotation, setShowAnnotation]     = useState(false)
+  const [savingAnnotation, setSavingAnnotation] = useState(false)
+
   const [vueComptable, setVueComptable] = useState(() => {
     try { return JSON.parse(localStorage.getItem('exercice_vue_comptable') ?? 'false') } catch { return false }
   })
@@ -563,6 +572,17 @@ export default function ExercicePage() {
   }
   function handleTab(t: Tab) { setTab(t); persist({ debut, fin, tab: t, activePreset }) }
 
+  // Sprint 3 — Feature A: year navigation
+  function navigateYear(delta: -1 | 1) {
+    const d1 = new Date(debut); d1.setFullYear(d1.getFullYear() + delta)
+    const d2 = new Date(fin);   d2.setFullYear(d2.getFullYear() + delta)
+    const nd = d1.toISOString().slice(0, 10)
+    const nf = d2.toISOString().slice(0, 10)
+    setDebut(nd); setFin(nf); setActivePreset(null)
+    if (drillCat) setDrillCat(null)
+    persist({ debut: nd, fin: nf, tab, activePreset: null })
+  }
+
   useEffect(() => {
     const supabase = createClient()
     async function load() {
@@ -572,6 +592,7 @@ export default function ExercicePage() {
         if (!user) { setError('Session expirée — rechargez la page.'); return }
         const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
         if (!m) { setError('Workspace introuvable.'); return }
+        setWorkspaceId(m.workspace_id)
         const [{ data: f, error: fe }, { data: d, error: de }] = await Promise.all([
           supabase.from('factures').select('*').eq('workspace_id', m.workspace_id),
           supabase.from('depenses').select('*').eq('workspace_id', m.workspace_id),
@@ -583,6 +604,36 @@ export default function ExercicePage() {
     load()
   }, [])
 
+  // Sprint 3 — Feature C: load annotation when workspaceId or debut changes
+  useEffect(() => {
+    if (!workspaceId) return
+    const annee = Number(debut.slice(0, 4))
+    const supabase = createClient()
+    supabase
+      .from('exercice_annotations')
+      .select('contenu')
+      .eq('workspace_id', workspaceId)
+      .eq('annee', annee)
+      .single()
+      .then(({ data }) => {
+        setAnnotation(data?.contenu ?? '')
+        setAnnotationSaved(false)
+      })
+  }, [workspaceId, debut])
+
+  async function saveAnnotation() {
+    if (!workspaceId) return
+    setSavingAnnotation(true)
+    const supabase = createClient()
+    const annee = Number(debut.slice(0, 4))
+    await supabase.from('exercice_annotations').upsert(
+      { workspace_id: workspaceId, annee, contenu: annotation, updated_at: new Date().toISOString() },
+      { onConflict: 'workspace_id,annee' }
+    )
+    setAnnotationSaved(true)
+    setSavingAnnotation(false)
+  }
+
   const pnl   = useMemo(() => computePnL(factures, depenses, debut, fin),            [factures, depenses, debut, fin])
   const bilan = useMemo(() => computeBilan(factures, depenses, debut, fin, pnl.resultat), [factures, depenses, debut, fin, pnl.resultat])
 
@@ -592,6 +643,35 @@ export default function ExercicePage() {
     const d2 = new Date(fin);   d2.setFullYear(d2.getFullYear() - 1)
     return computePnL(factures, depenses, d1.toISOString().slice(0, 10), d2.toISOString().slice(0, 10))
   }, [factures, depenses, debut, fin])
+
+  // Sprint 3 — Feature B: projection fin d'année
+  const isProjectable = useMemo(() => {
+    if (pnl.total_produits === 0) return false
+    const y = debut.slice(0, 4)
+    if (debut !== `${y}-01-01`) return false
+    if (fin >= `${y}-12-31`) return false
+    if (debut.slice(0, 4) !== fin.slice(0, 4)) return false
+    return true
+  }, [debut, fin, pnl.total_produits])
+
+  const projection = useMemo(() => {
+    if (!isProjectable) return null
+    const y = Number(debut.slice(0, 4))
+    const isLeap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0
+    const totalDays = isLeap ? 366 : 365
+    const d1 = new Date(debut + 'T00:00:00')
+    const d2 = new Date(fin + 'T00:00:00')
+    const elapsed = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000) + 1)
+    const factor = totalDays / elapsed
+    return {
+      produits: round2(pnl.total_produits * factor),
+      charges:  round2(pnl.total_charges  * factor),
+      resultat: round2(pnl.resultat       * factor),
+      elapsed,
+      totalDays,
+      pct: Math.round((elapsed / totalDays) * 100),
+    }
+  }, [isProjectable, debut, fin, pnl])
 
   // Period labels for compare header
   const labelN  = debut.slice(0, 4) === fin.slice(0, 4) ? debut.slice(0, 4) : `${debut.slice(0, 4)}–${fin.slice(0, 4)}`
@@ -656,7 +736,7 @@ export default function ExercicePage() {
         </div>
       </div>
 
-      <div className="no-print" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+      <div className="no-print" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20, alignItems: 'center' }}>
         {ps.map((p, i) => {
           const isFuture = new Date(p.debut) > new Date()
           return (
@@ -674,6 +754,26 @@ export default function ExercicePage() {
             </button>
           )
         })}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+          <button
+            className="dash-btn-ghost"
+            onClick={() => navigateYear(-1)}
+            style={{ fontSize: 14, padding: '4px 10px' }}
+            title="Exercice précédent"
+            aria-label="Exercice précédent"
+          >
+            ←
+          </button>
+          <button
+            className="dash-btn-ghost"
+            onClick={() => navigateYear(1)}
+            style={{ fontSize: 14, padding: '4px 10px' }}
+            title="Exercice suivant"
+            aria-label="Exercice suivant"
+          >
+            →
+          </button>
+        </div>
       </div>
 
       {loading && <div className="dash-loading">Chargement…</div>}
@@ -725,6 +825,64 @@ export default function ExercicePage() {
           </div>
 
           <ExecSummary pnl={pnl} debut={debut} fin={fin} />
+
+          {/* Sprint 3 — Feature B: Projection fin d'année */}
+          {projection && (
+            <div className="dash-projection-banner no-print">
+              <div className="dash-projection-label">Projection fin d&apos;année</div>
+              <div className="dash-projection-body">
+                <span style={{ fontSize: 12, color: 'var(--pencil)' }}>
+                  Basé sur {projection.elapsed} j / {projection.totalDays} j ({projection.pct} % de l&apos;année écoulée) — extrapolation linéaire
+                </span>
+                <div className="dash-projection-values">
+                  <span>CA projeté : <strong style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(projection.produits)}</strong></span>
+                  <span>Charges : <strong style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(projection.charges)}</strong></span>
+                  <span style={{ color: projection.resultat >= 0 ? '#15803d' : '#dc2626' }}>
+                    Résultat projeté : <strong style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(projection.resultat)}</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Sprint 3 — Feature C: Annotation d'exercice */}
+          <div className="no-print" style={{ marginBottom: 16 }}>
+            <button
+              className="dash-btn-ghost"
+              onClick={() => setShowAnnotation(v => !v)}
+              style={{ fontSize: 12, marginBottom: showAnnotation ? 10 : 0 }}
+            >
+              {showAnnotation ? '▼' : '▶'} Notes d&apos;exercice {debut.slice(0, 4)}
+            </button>
+
+            {showAnnotation && workspaceId && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 600 }}>
+                <textarea
+                  className="dash-field-input"
+                  value={annotation}
+                  onChange={e => { setAnnotation(e.target.value); setAnnotationSaved(false) }}
+                  placeholder={`Observations sur l'exercice ${debut.slice(0, 4)} — décisions prises, contexte, objectifs…`}
+                  rows={4}
+                  style={{ resize: 'vertical', fontFamily: 'Inter, sans-serif', fontSize: 13 }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button
+                    className="dash-btn"
+                    onClick={saveAnnotation}
+                    disabled={savingAnnotation}
+                    style={{ fontSize: 12 }}
+                  >
+                    {savingAnnotation ? '…' : 'Enregistrer'}
+                  </button>
+                  {annotationSaved && (
+                    <span style={{ fontSize: 12, color: '#15803d', fontFamily: 'Courier Prime,monospace' }}>
+                      ✓ Enregistré
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Feature #16 — Ratios de gestion */}
           <div className="no-print" style={{ marginBottom: 20 }}>

@@ -469,6 +469,30 @@ export interface Database {
         }
         Relationships: []
       }
+      exercice_annotations: {
+        Row: {
+          id: number
+          workspace_id: string
+          annee: number
+          contenu: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          workspace_id: string
+          annee: number
+          contenu?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          workspace_id?: string
+          annee?: number
+          contenu?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -493,3 +517,4 @@ export type ShineAccount   = Database['public']['Tables']['shine_accounts']['Row
 export type ShineImport    = Database['public']['Tables']['shine_imports']['Row']
 export type Feedback       = Database['public']['Tables']['feedbacks']['Row']
 export type FeedbackVote   = Database['public']['Tables']['feedback_votes']['Row']
+export type ExerciceAnnotation = Database['public']['Tables']['exercice_annotations']['Row']
