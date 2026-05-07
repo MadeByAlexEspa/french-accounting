@@ -615,7 +615,7 @@ export default function TVAPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {ff.map(f => {
+                    {ff.slice(0, 10).map(f => {
                       const erreur = isTvaErronnee(f)
                       return (
                       <tr key={f.id} style={erreur ? { background: 'rgba(239,68,68,0.06)' } : undefined}>
@@ -645,14 +645,6 @@ export default function TVAPage() {
                       )
                     })}
                   </tbody>
-                  <tfoot><tr>
-                    <td colSpan={2}><strong>Total</strong></td>
-                    <td className="right"><strong>{formatEur(ff.reduce((s, f) => s + f.montant_ht, 0))}</strong></td>
-                    <td />
-                    <td className="right"><strong>{formatEur(ff.reduce((s, f) => s + f.montant_tva, 0))}</strong></td>
-                    <td className="right"><strong>{formatEur(ff.reduce((s, f) => s + f.montant_ttc, 0))}</strong></td>
-                    <td />
-                  </tr></tfoot>
                 </table></div>
               )}
           </div>
@@ -684,7 +676,7 @@ export default function TVAPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {fd.map(d => {
+                    {fd.slice(0, 10).map(d => {
                       const erreur = isTvaErronnee(d)
                       return (
                       <tr key={d.id} style={erreur ? { background: 'rgba(239,68,68,0.06)' } : undefined}>
@@ -714,14 +706,6 @@ export default function TVAPage() {
                       )
                     })}
                   </tbody>
-                  <tfoot><tr>
-                    <td colSpan={2}><strong>Total</strong></td>
-                    <td className="right"><strong>{formatEur(fd.reduce((s, d) => s + d.montant_ht, 0))}</strong></td>
-                    <td />
-                    <td className="right"><strong>{formatEur(fd.reduce((s, d) => s + d.montant_tva, 0))}</strong></td>
-                    <td className="right"><strong>{formatEur(fd.reduce((s, d) => s + d.montant_ttc, 0))}</strong></td>
-                    <td />
-                  </tr></tfoot>
                 </table></div>
               )}
           </div>
