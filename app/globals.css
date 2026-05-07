@@ -1878,3 +1878,20 @@ body {
   flex-wrap: wrap;
   font-size: 14px;
 }
+
+/* Clôture banner */
+.dash-cloture-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-left: 3px solid #d97706;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: #92400e;
+  font-family: 'Courier Prime', monospace;
+}

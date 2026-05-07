@@ -494,9 +494,133 @@ function BilanTab({ debut, fin, bilan, vueComptable }: { debut: string; fin: str
   )
 }
 
+// ── Monthly data (Feature: Tendance tab) ─────────────────────────────────────
+
+interface MonthlyData {
+  month: string   // "2025-01"
+  label: string   // "Jan"
+  produits: number
+  charges: number
+  resultat: number
+}
+
+function computeMonthly(factures: Facture[], depenses: Depense[], debut: string, fin: string): MonthlyData[] {
+  const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+  const acc: Record<string, MonthlyData> = {}
+  const cur = new Date(debut.slice(0, 7) + '-01T00:00:00')
+  const end = new Date(fin.slice(0, 7) + '-01T00:00:00')
+  while (cur <= end) {
+    const key = cur.toISOString().slice(0, 7)
+    acc[key] = { month: key, label: monthNames[cur.getMonth()], produits: 0, charges: 0, resultat: 0 }
+    cur.setMonth(cur.getMonth() + 1)
+  }
+  for (const f of factures) {
+    if (f.date < debut || f.date > fin || isBilanCat(f.categorie)) continue
+    const key = f.date.slice(0, 7)
+    if (acc[key]) acc[key].produits = round2(acc[key].produits + f.montant_ht)
+  }
+  for (const d of depenses) {
+    if (d.date < debut || d.date > fin || isBilanCat(d.categorie) || isImmobi(d.categorie)) continue
+    const key = d.date.slice(0, 7)
+    if (acc[key]) acc[key].charges = round2(acc[key].charges + d.montant_ht)
+  }
+  return Object.values(acc)
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map(m => ({ ...m, resultat: round2(m.produits - m.charges) }))
+}
+
+function TendanceChart({ monthly }: { monthly: MonthlyData[] }) {
+  if (monthly.length === 0) return (
+    <div style={{ textAlign: 'center', padding: 48, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace', fontSize: 13 }}>
+      Aucune donnée sur cette période.
+    </div>
+  )
+
+  const svgW = 680, svgH = 280
+  const padL = 72, padR = 20, padT = 20, padB = 48
+  const chartW = svgW - padL - padR
+  const chartH = svgH - padT - padB
+
+  const maxVal = Math.max(...monthly.flatMap(m => [m.produits, m.charges]), 1)
+  const n = monthly.length
+  const colW = chartW / n
+  const barW = Math.min(colW * 0.35, 22)
+  const gap = barW * 0.4
+
+  function toY(v: number) { return padT + chartH * (1 - v / maxVal) }
+  function toH(v: number) { return chartH * (v / maxVal) }
+
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(r => ({
+    y: padT + chartH * (1 - r),
+    label: formatEur(maxVal * r),
+  }))
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <svg width={svgW} height={svgH} style={{ display: 'block', margin: '0 auto', fontFamily: 'Inter,sans-serif', fontSize: 11 }}>
+        {ticks.map(t => (
+          <g key={t.y}>
+            <line x1={padL} x2={svgW - padR} y1={t.y} y2={t.y} stroke="#e8e8e4" strokeWidth={1} />
+            <text x={padL - 6} y={t.y + 4} textAnchor="end" fill="#4a4a4a" fontSize={9} fontFamily="Courier Prime,monospace">
+              {t.label}
+            </text>
+          </g>
+        ))}
+
+        {monthly.map((m, i) => {
+          const cx = padL + i * colW + colW / 2
+          const xP = cx - gap / 2 - barW
+          const xC = cx + gap / 2
+          return (
+            <g key={m.month}>
+              {m.produits > 0 && (
+                <rect x={xP} y={toY(m.produits)} width={barW} height={toH(m.produits)}
+                  fill="#1a56db" fillOpacity={0.85} rx={2} />
+              )}
+              {m.charges > 0 && (
+                <rect x={xC} y={toY(m.charges)} width={barW} height={toH(m.charges)}
+                  fill="#f59e0b" fillOpacity={0.85} rx={2} />
+              )}
+              <text x={cx} y={svgH - padB + 16} textAnchor="middle" fill="#4a4a4a" fontSize={10}>
+                {m.label}
+              </text>
+              {(i === 0 || m.month.endsWith('-01')) && (
+                <text x={cx} y={svgH - padB + 28} textAnchor="middle" fill="#9ca3af" fontSize={9}>
+                  {m.month.slice(0, 4)}
+                </text>
+              )}
+            </g>
+          )
+        })}
+
+        {monthly.length > 1 && (() => {
+          const points = monthly.map((m, i) => {
+            const cx = padL + i * colW + colW / 2
+            const y = toY(Math.max(m.resultat, 0))
+            return `${cx},${y}`
+          }).join(' ')
+          return (
+            <polyline points={points} fill="none" stroke="#15803d" strokeWidth={1.5}
+              strokeDasharray="4 3" strokeLinecap="round" strokeLinejoin="round" />
+          )
+        })()}
+
+        <g transform={`translate(${padL}, ${svgH - 6})`}>
+          <rect width={10} height={10} fill="#1a56db" fillOpacity={0.85} rx={2} y={-10} />
+          <text x={14} y={0} fill="#4a4a4a" fontSize={10}>Produits</text>
+          <rect x={80} width={10} height={10} fill="#f59e0b" fillOpacity={0.85} rx={2} y={-10} />
+          <text x={94} y={0} fill="#4a4a4a" fontSize={10}>Charges</text>
+          <line x1={168} x2={178} y1={-5} y2={-5} stroke="#15803d" strokeWidth={1.5} strokeDasharray="4 3" />
+          <text x={182} y={0} fill="#4a4a4a" fontSize={10}>Résultat</text>
+        </g>
+      </svg>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'resultat' | 'bilan'
+type Tab = 'resultat' | 'bilan' | 'tendance'
 const LS_EXERCICE = 'exercice_params'
 
 export default function ExercicePage() {
@@ -526,6 +650,12 @@ export default function ExercicePage() {
   const [annotationSaved, setAnnotationSaved]   = useState(false)
   const [showAnnotation, setShowAnnotation]     = useState(false)
   const [savingAnnotation, setSavingAnnotation] = useState(false)
+
+  // Feature: Exercice clôturé
+  const [estCloture, setEstCloture]   = useState(false)
+  const [clotureDate, setClotureDate] = useState<string | null>(null)
+  const [cloturant, setCloturant]     = useState(false)
+  const [userId, setUserId]           = useState<string | null>(null)
 
   const [vueComptable, setVueComptable] = useState(() => {
     try { return JSON.parse(localStorage.getItem('exercice_vue_comptable') ?? 'false') } catch { return false }
@@ -590,6 +720,7 @@ export default function ExercicePage() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { setError('Session expirée — rechargez la page.'); return }
+        setUserId(user.id)
         const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
         if (!m) { setError('Workspace introuvable.'); return }
         setWorkspaceId(m.workspace_id)
@@ -621,6 +752,54 @@ export default function ExercicePage() {
       })
   }, [workspaceId, debut])
 
+  // Feature: Exercice clôturé — load status
+  useEffect(() => {
+    if (!workspaceId) return
+    const annee = Number(debut.slice(0, 4))
+    const supabase = createClient()
+    supabase
+      .from('exercice_clotures')
+      .select('cloture_le')
+      .eq('workspace_id', workspaceId)
+      .eq('annee', annee)
+      .single()
+      .then(({ data }) => {
+        setEstCloture(!!data)
+        setClotureDate(data?.cloture_le ?? null)
+      })
+  }, [workspaceId, debut])
+
+  async function cloturerExercice() {
+    if (!workspaceId || !userId) return
+    if (!window.confirm(`Clôturer l'exercice ${debut.slice(0, 4)} ? Cette action signale la fin de l'exercice comptable.`)) return
+    setCloturant(true)
+    const supabase = createClient()
+    const annee = Number(debut.slice(0, 4))
+    await supabase.from('exercice_clotures').insert({
+      workspace_id: workspaceId,
+      annee,
+      cloture_par: userId,
+    })
+    setEstCloture(true)
+    setClotureDate(new Date().toISOString())
+    setCloturant(false)
+  }
+
+  async function rouvrirExercice() {
+    if (!workspaceId) return
+    if (!window.confirm(`Rouvrir l'exercice ${debut.slice(0, 4)} ?`)) return
+    setCloturant(true)
+    const supabase = createClient()
+    const annee = Number(debut.slice(0, 4))
+    await supabase.from('exercice_clotures')
+      .delete()
+      .eq('workspace_id', workspaceId)
+      .eq('annee', annee)
+    setEstCloture(false)
+    setClotureDate(null)
+    setCloturant(false)
+  }
+
   async function saveAnnotation() {
     if (!workspaceId) return
     setSavingAnnotation(true)
@@ -636,6 +815,12 @@ export default function ExercicePage() {
 
   const pnl   = useMemo(() => computePnL(factures, depenses, debut, fin),            [factures, depenses, debut, fin])
   const bilan = useMemo(() => computeBilan(factures, depenses, debut, fin, pnl.resultat), [factures, depenses, debut, fin, pnl.resultat])
+
+  // Feature: Tendance mensuelle
+  const monthly = useMemo(
+    () => computeMonthly(factures, depenses, debut, fin),
+    [factures, depenses, debut, fin]
+  )
 
   // Feature #7 — N-1 PnL
   const pnlN1 = useMemo(() => {
@@ -705,6 +890,17 @@ export default function ExercicePage() {
           >
             {compareMode ? '◆ N vs N-1' : '◇ N vs N-1'}
           </button>
+          {workspaceId && !estCloture && (
+            <button
+              className="dash-btn-ghost"
+              onClick={cloturerExercice}
+              disabled={cloturant}
+              style={{ fontSize: 11 }}
+              title={`Clôturer l'exercice ${debut.slice(0, 4)}`}
+            >
+              {cloturant ? '…' : '⊠ Clôturer'}
+            </button>
+          )}
           <button
             className="dash-btn-ghost"
             style={{ fontSize: 12 }}
@@ -725,10 +921,10 @@ export default function ExercicePage() {
           </button>
           <button
             className="dash-btn-ghost"
-            aria-label="Imprimer ou exporter en PDF"
-            onClick={() => window.print()}
+            aria-label="Exporter en PDF (ouvre un nouvel onglet optimisé impression)"
+            onClick={() => window.open(`/api/exercice-print?debut=${debut}&fin=${fin}`, '_blank')}
           >
-            ↓ Imprimer / PDF
+            ↓ Export PDF
           </button>
           <input type="date" className="dash-filter-input" value={debut} onChange={e => handleDebut(e.target.value)} aria-label="Date de début" />
           <ChevronRight size={13} style={{ color: 'var(--pencil)' }} aria-hidden="true" />
@@ -781,6 +977,23 @@ export default function ExercicePage() {
 
       {!loading && (
         <>
+          {/* Feature: Clôture banner */}
+          {estCloture && clotureDate && (
+            <div className="dash-cloture-banner">
+              <span>
+                Exercice {debut.slice(0, 4)} clôturé le {new Date(clotureDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
+              </span>
+              <button
+                className="dash-btn-ghost"
+                onClick={rouvrirExercice}
+                disabled={cloturant}
+                style={{ fontSize: 11 }}
+              >
+                Rouvrir
+              </button>
+            </div>
+          )}
+
           <div className="dash-kpi-grid">
             <div className="dash-kpi-card">
               <p className="dash-kpi-label">Produits HT</p>
@@ -966,6 +1179,16 @@ export default function ExercicePage() {
               onClick={() => handleTab('bilan')}
             >
               Bilan simplifié
+            </button>
+            <button
+              role="tab"
+              id="tab-tendance"
+              aria-selected={tab === 'tendance'}
+              aria-controls="tabpanel-tendance"
+              className={`dash-pill-tab${tab === 'tendance' ? ' dash-pill-tab-active' : ''}`}
+              onClick={() => handleTab('tendance')}
+            >
+              Tendance mensuelle
             </button>
           </div>
 
@@ -1186,6 +1409,19 @@ export default function ExercicePage() {
           {/* ── Bilan ───────────────────────────────────────────────────── */}
           <div role="tabpanel" id="tabpanel-bilan" aria-labelledby="tab-bilan">
             {tab === 'bilan' && <BilanTab debut={debut} fin={fin} bilan={bilan} vueComptable={vueComptable} />}
+          </div>
+
+          {/* ── Tendance mensuelle ───────────────────────────────────────── */}
+          <div role="tabpanel" id="tabpanel-tendance" aria-labelledby="tab-tendance">
+            {tab === 'tendance' && (
+              <div className="dash-section">
+                <TendanceChart monthly={monthly} />
+                <p style={{ marginTop: 12, fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)' }}>
+                  Barres bleues = produits HT · Barres ambrées = charges HT · Ligne verte pointillée = résultat mensuel.
+                  Les catégories de bilan (Cl. 1, Cl. 2, 455, 58) sont exclues.
+                </p>
+              </div>
+            )}
           </div>
         </>
       )}

@@ -493,6 +493,27 @@ export interface Database {
         }
         Relationships: []
       }
+      exercice_clotures: {
+        Row: {
+          workspace_id: string
+          annee: number
+          cloture_le: string
+          cloture_par: string
+        }
+        Insert: {
+          workspace_id: string
+          annee: number
+          cloture_le?: string
+          cloture_par: string
+        }
+        Update: {
+          workspace_id?: string
+          annee?: number
+          cloture_le?: string
+          cloture_par?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -518,3 +539,4 @@ export type ShineImport    = Database['public']['Tables']['shine_imports']['Row'
 export type Feedback       = Database['public']['Tables']['feedbacks']['Row']
 export type FeedbackVote   = Database['public']['Tables']['feedback_votes']['Row']
 export type ExerciceAnnotation = Database['public']['Tables']['exercice_annotations']['Row']
+export type ExerciceCloture = Database['public']['Tables']['exercice_clotures']['Row']
