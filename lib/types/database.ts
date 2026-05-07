@@ -433,18 +433,21 @@ export interface Database {
           content: string
           created_at: string
           user_id: string
+          image_url: string | null
         }
         Insert: {
           id?: number
           content: string
           created_at?: string
           user_id: string
+          image_url?: string | null
         }
         Update: {
           id?: number
           content?: string
           created_at?: string
           user_id?: string
+          image_url?: string | null
         }
         Relationships: []
       }

@@ -1,18 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Feedback } from '@/lib/types/database'
 
 type EnrichedFeedback = Feedback & { voteCount: number; userVoted: boolean }
 
 export default function FeedbackPanel() {
-  const [open, setOpen]           = useState(false)
-  const [feedbacks, setFeedbacks] = useState<EnrichedFeedback[]>([])
-  const [loading, setLoading]     = useState(false)
+  const [open, setOpen]             = useState(false)
+  const [feedbacks, setFeedbacks]   = useState<EnrichedFeedback[]>([])
+  const [loading, setLoading]       = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [newContent, setNewContent] = useState('')
-  const [userId, setUserId]       = useState<string | null>(null)
+  const [userId, setUserId]         = useState<string | null>(null)
+  const [imageFile, setImageFile]   = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     function handler() { setOpen(true) }
@@ -54,13 +57,41 @@ export default function FeedbackPanel() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setImageFile(f)
+    setImagePreview(prev => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(f) })
+  }
+
+  function removeImage() {
+    setImageFile(null)
+    setImagePreview(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!newContent.trim() || !userId) return
     setSubmitting(true)
     const supabase = createClient()
-    await supabase.from('feedbacks').insert({ content: newContent.trim(), user_id: userId })
+
+    let image_url: string | null = null
+    if (imageFile) {
+      const ext = imageFile.name.split('.').pop() ?? 'jpg'
+      const path = `${userId}/${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('feedback-images')
+        .upload(path, imageFile, { upsert: false })
+      if (!upErr) {
+        const { data } = supabase.storage.from('feedback-images').getPublicUrl(path)
+        image_url = data.publicUrl
+      }
+    }
+
+    await supabase.from('feedbacks').insert({ content: newContent.trim(), user_id: userId, image_url })
     setNewContent('')
+    removeImage()
     await load()
     setSubmitting(false)
   }
@@ -73,7 +104,6 @@ export default function FeedbackPanel() {
     } else {
       await supabase.from('feedback_votes').insert({ feedback_id: feedbackId, user_id: userId })
     }
-    // Optimistic update
     setFeedbacks(prev =>
       prev.map(f =>
         f.id === feedbackId
@@ -105,6 +135,52 @@ export default function FeedbackPanel() {
               rows={3}
               maxLength={500}
             />
+
+            {/* Image picker */}
+            <div style={{ marginTop: 8 }}>
+              {imagePreview ? (
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <img
+                    src={imagePreview}
+                    alt="Aperçu"
+                    style={{ maxHeight: 120, maxWidth: '100%', display: 'block', border: '1px solid var(--rule)', borderRadius: 2 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    style={{
+                      position: 'absolute', top: 4, right: 4,
+                      background: 'rgba(0,0,0,0.55)', color: '#fff', border: 'none',
+                      borderRadius: 2, cursor: 'pointer', fontSize: 11, padding: '1px 5px', lineHeight: 1.4,
+                    }}
+                    aria-label="Supprimer l'image"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    background: 'none', border: '1px dashed var(--rule)', borderRadius: 2,
+                    color: 'var(--pencil)', cursor: 'pointer', fontSize: 11,
+                    fontFamily: 'Courier Prime,monospace', padding: '5px 10px',
+                  }}
+                >
+                  📷 Ajouter une image
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+                aria-label="Choisir une image"
+              />
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
               <span style={{ fontSize: 11, color: 'var(--pencil)', alignSelf: 'center', fontFamily: 'Courier Prime,monospace' }}>
                 {newContent.length}/500
@@ -136,6 +212,15 @@ export default function FeedbackPanel() {
           {!loading && feedbacks.map(f => (
             <div key={f.id} className="fp-item">
               <p className="fp-item-content">{f.content}</p>
+              {f.image_url && (
+                <a href={f.image_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: 8 }}>
+                  <img
+                    src={f.image_url}
+                    alt="Capture jointe"
+                    style={{ maxWidth: '100%', maxHeight: 200, objectFit: 'contain', border: '1px solid var(--rule)', borderRadius: 2, display: 'block' }}
+                  />
+                </a>
+              )}
               <div className="fp-item-meta">
                 <span style={{ fontSize: 11, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace' }}>
                   {new Date(f.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
