@@ -67,7 +67,7 @@ export default async function DashboardHome({
       .lte('date', fin),
     supabase
       .from('depenses')
-      .select('montant_ht, montant_tva, montant_ttc, date')
+      .select('montant_ht, montant_tva, montant_ttc, statut, date')
       .eq('workspace_id', m.workspace_id)
       .gte('date', debut)
       .lte('date', fin),
@@ -102,6 +102,12 @@ export default async function DashboardHome({
     r.statut === 'en_attente' && r.date < thirtyDaysAgo.toISOString().slice(0, 10)
   )
   const overdueTotal = round2(overdueRows.reduce((s, r) => s + r.montant_ttc, 0))
+
+  // Ratios de gestion
+  const margeNette   = ca > 0 ? Math.round(resultat / ca * 1000) / 10 : null
+  const chargesSurCA = ca > 0 ? Math.round(charges / ca * 1000) / 10 : null
+  const dettesF      = round2(d.filter(r => r.statut === 'en_attente').reduce((s, r) => s + r.montant_ttc, 0))
+  const bfr          = round2(impayees - dettesF)
 
   // Alert: TVA declaration deadline (within 15 days of end of quarter)
   const m0 = today.getMonth() // 0-based
@@ -215,6 +221,46 @@ export default async function DashboardHome({
               ? 'Aucune facture en attente'
               : `${impayeesRows.length} facture${impayeesRows.length !== 1 ? 's' : ''} en attente de paiement`}
           </p>
+        </div>
+      </div>
+
+      {/* Ratios de gestion */}
+      <div className="dash-card" style={{ marginTop: 8 }}>
+        <p className="dash-card-title" style={{ marginBottom: 16 }}>Ratios de gestion</p>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <div className="dash-ratio-card">
+            <div className="dash-ratio-label">Marge nette</div>
+            <div className="dash-ratio-value" style={{
+              color: margeNette === null ? 'var(--pencil)'
+                : margeNette < 0 ? '#dc2626'
+                : margeNette < 15 ? '#d97706'
+                : '#15803d'
+            }}>
+              {margeNette === null ? '—' : `${margeNette} %`}
+            </div>
+            <div className="dash-ratio-desc">Résultat / CA HT</div>
+          </div>
+
+          <div className="dash-ratio-card">
+            <div className="dash-ratio-label">Charges / CA</div>
+            <div className="dash-ratio-value" style={{
+              color: chargesSurCA === null ? 'var(--pencil)'
+                : chargesSurCA > 90 ? '#dc2626'
+                : chargesSurCA > 75 ? '#d97706'
+                : '#15803d'
+            }}>
+              {chargesSurCA === null ? '—' : `${chargesSurCA} %`}
+            </div>
+            <div className="dash-ratio-desc">Charges HT / CA HT</div>
+          </div>
+
+          <div className="dash-ratio-card">
+            <div className="dash-ratio-label">BFR simplifié</div>
+            <div className="dash-ratio-value" style={{ color: bfr > 0 ? '#d97706' : '#15803d' }}>
+              {fmt(bfr)}
+            </div>
+            <div className="dash-ratio-desc">Créances – Dettes fournisseurs</div>
+          </div>
         </div>
       </div>
 

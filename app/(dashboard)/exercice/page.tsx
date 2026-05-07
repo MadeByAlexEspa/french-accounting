@@ -260,22 +260,6 @@ function SubtotalRow({ label, liasse, montant, bold, showRef }: { label: string;
   )
 }
 
-// ── Résumé exécutif (#6) ──────────────────────────────────────────────────────
-
-function ExecSummary({ pnl, debut, fin }: { pnl: PnL; debut: string; fin: string }) {
-  if (pnl.total_produits === 0 && pnl.total_charges === 0) return null
-  const marge = pnl.total_produits > 0 ? Math.round((pnl.resultat / pnl.total_produits) * 100) : null
-  const text = pnl.resultat >= 0
-    ? `Sur la période ${formatDateFr(debut)} – ${formatDateFr(fin)}, vous avez réalisé ${formatEur(pnl.total_produits)} de chiffre d'affaires pour ${formatEur(pnl.resultat)} de bénéfice${marge !== null ? ` (marge ${marge} %)` : ''}.`
-    : `Sur la période ${formatDateFr(debut)} – ${formatDateFr(fin)}, vos charges (${formatEur(pnl.total_charges)}) dépassent vos produits (${formatEur(pnl.total_produits)}) — déficit de ${formatEur(Math.abs(pnl.resultat))}.`
-  return (
-    <div className="dash-exec-summary">
-      <span className="dash-exec-icon">{pnl.resultat >= 0 ? '↗' : '↘'}</span>
-      <p className="dash-exec-text">{text}</p>
-    </div>
-  )
-}
-
 // ── DrillDrawer (Feature #8) ──────────────────────────────────────────────────
 
 function DrillDrawer({
@@ -494,133 +478,9 @@ function BilanTab({ debut, fin, bilan, vueComptable }: { debut: string; fin: str
   )
 }
 
-// ── Monthly data (Feature: Tendance tab) ─────────────────────────────────────
-
-interface MonthlyData {
-  month: string   // "2025-01"
-  label: string   // "Jan"
-  produits: number
-  charges: number
-  resultat: number
-}
-
-function computeMonthly(factures: Facture[], depenses: Depense[], debut: string, fin: string): MonthlyData[] {
-  const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
-  const acc: Record<string, MonthlyData> = {}
-  const cur = new Date(debut.slice(0, 7) + '-01T00:00:00')
-  const end = new Date(fin.slice(0, 7) + '-01T00:00:00')
-  while (cur <= end) {
-    const key = cur.toISOString().slice(0, 7)
-    acc[key] = { month: key, label: monthNames[cur.getMonth()], produits: 0, charges: 0, resultat: 0 }
-    cur.setMonth(cur.getMonth() + 1)
-  }
-  for (const f of factures) {
-    if (f.date < debut || f.date > fin || isBilanCat(f.categorie)) continue
-    const key = f.date.slice(0, 7)
-    if (acc[key]) acc[key].produits = round2(acc[key].produits + f.montant_ht)
-  }
-  for (const d of depenses) {
-    if (d.date < debut || d.date > fin || isBilanCat(d.categorie) || isImmobi(d.categorie)) continue
-    const key = d.date.slice(0, 7)
-    if (acc[key]) acc[key].charges = round2(acc[key].charges + d.montant_ht)
-  }
-  return Object.values(acc)
-    .sort((a, b) => a.month.localeCompare(b.month))
-    .map(m => ({ ...m, resultat: round2(m.produits - m.charges) }))
-}
-
-function TendanceChart({ monthly }: { monthly: MonthlyData[] }) {
-  if (monthly.length === 0) return (
-    <div style={{ textAlign: 'center', padding: 48, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace', fontSize: 13 }}>
-      Aucune donnée sur cette période.
-    </div>
-  )
-
-  const svgW = 680, svgH = 280
-  const padL = 72, padR = 20, padT = 20, padB = 48
-  const chartW = svgW - padL - padR
-  const chartH = svgH - padT - padB
-
-  const maxVal = Math.max(...monthly.flatMap(m => [m.produits, m.charges]), 1)
-  const n = monthly.length
-  const colW = chartW / n
-  const barW = Math.min(colW * 0.35, 22)
-  const gap = barW * 0.4
-
-  function toY(v: number) { return padT + chartH * (1 - v / maxVal) }
-  function toH(v: number) { return chartH * (v / maxVal) }
-
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map(r => ({
-    y: padT + chartH * (1 - r),
-    label: formatEur(maxVal * r),
-  }))
-
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <svg width={svgW} height={svgH} style={{ display: 'block', margin: '0 auto', fontFamily: 'Inter,sans-serif', fontSize: 11 }}>
-        {ticks.map(t => (
-          <g key={t.y}>
-            <line x1={padL} x2={svgW - padR} y1={t.y} y2={t.y} stroke="#e8e8e4" strokeWidth={1} />
-            <text x={padL - 6} y={t.y + 4} textAnchor="end" fill="#4a4a4a" fontSize={9} fontFamily="Courier Prime,monospace">
-              {t.label}
-            </text>
-          </g>
-        ))}
-
-        {monthly.map((m, i) => {
-          const cx = padL + i * colW + colW / 2
-          const xP = cx - gap / 2 - barW
-          const xC = cx + gap / 2
-          return (
-            <g key={m.month}>
-              {m.produits > 0 && (
-                <rect x={xP} y={toY(m.produits)} width={barW} height={toH(m.produits)}
-                  fill="#1a56db" fillOpacity={0.85} rx={2} />
-              )}
-              {m.charges > 0 && (
-                <rect x={xC} y={toY(m.charges)} width={barW} height={toH(m.charges)}
-                  fill="#f59e0b" fillOpacity={0.85} rx={2} />
-              )}
-              <text x={cx} y={svgH - padB + 16} textAnchor="middle" fill="#4a4a4a" fontSize={10}>
-                {m.label}
-              </text>
-              {(i === 0 || m.month.endsWith('-01')) && (
-                <text x={cx} y={svgH - padB + 28} textAnchor="middle" fill="#9ca3af" fontSize={9}>
-                  {m.month.slice(0, 4)}
-                </text>
-              )}
-            </g>
-          )
-        })}
-
-        {monthly.length > 1 && (() => {
-          const points = monthly.map((m, i) => {
-            const cx = padL + i * colW + colW / 2
-            const y = toY(Math.max(m.resultat, 0))
-            return `${cx},${y}`
-          }).join(' ')
-          return (
-            <polyline points={points} fill="none" stroke="#15803d" strokeWidth={1.5}
-              strokeDasharray="4 3" strokeLinecap="round" strokeLinejoin="round" />
-          )
-        })()}
-
-        <g transform={`translate(${padL}, ${svgH - 6})`}>
-          <rect width={10} height={10} fill="#1a56db" fillOpacity={0.85} rx={2} y={-10} />
-          <text x={14} y={0} fill="#4a4a4a" fontSize={10}>Produits</text>
-          <rect x={80} width={10} height={10} fill="#f59e0b" fillOpacity={0.85} rx={2} y={-10} />
-          <text x={94} y={0} fill="#4a4a4a" fontSize={10}>Charges</text>
-          <line x1={168} x2={178} y1={-5} y2={-5} stroke="#15803d" strokeWidth={1.5} strokeDasharray="4 3" />
-          <text x={182} y={0} fill="#4a4a4a" fontSize={10}>Résultat</text>
-        </g>
-      </svg>
-    </div>
-  )
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'resultat' | 'bilan' | 'tendance'
+type Tab = 'resultat' | 'bilan'
 const LS_EXERCICE = 'exercice_params'
 
 export default function ExercicePage() {
@@ -639,17 +499,8 @@ export default function ExercicePage() {
   // Feature #8 — Drill-down drawer
   const [drillCat, setDrillCat] = useState<string | null>(null)
 
-  // Feature #16 — Ratios de gestion
-  const [showRatios, setShowRatios] = useState(false)
-
-  // Sprint 3 — workspace id (needed for annotation persistence)
+  // Sprint 3 — workspace id (needed for clôture)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
-
-  // Sprint 3 — Feature C: Annotation d'exercice
-  const [annotation, setAnnotation]         = useState('')
-  const [annotationSaved, setAnnotationSaved]   = useState(false)
-  const [showAnnotation, setShowAnnotation]     = useState(false)
-  const [savingAnnotation, setSavingAnnotation] = useState(false)
 
   // Feature: Exercice clôturé
   const [estCloture, setEstCloture]   = useState(false)
@@ -672,7 +523,7 @@ export default function ExercicePage() {
       const saved = JSON.parse(localStorage.getItem(LS_EXERCICE) ?? 'null')
       if (saved?.debut && saved?.fin) {
         setDebut(saved.debut); setFin(saved.fin)
-        if (saved.tab) setTab(saved.tab)
+        if (saved.tab && saved.tab !== 'tendance') setTab(saved.tab)
         if (saved.activePreset !== undefined) setActivePreset(saved.activePreset)
       }
     } catch { /* ignore */ }
@@ -735,23 +586,6 @@ export default function ExercicePage() {
     load()
   }, [])
 
-  // Sprint 3 — Feature C: load annotation when workspaceId or debut changes
-  useEffect(() => {
-    if (!workspaceId) return
-    const annee = Number(debut.slice(0, 4))
-    const supabase = createClient()
-    supabase
-      .from('exercice_annotations')
-      .select('contenu')
-      .eq('workspace_id', workspaceId)
-      .eq('annee', annee)
-      .single()
-      .then(({ data }) => {
-        setAnnotation(data?.contenu ?? '')
-        setAnnotationSaved(false)
-      })
-  }, [workspaceId, debut])
-
   // Feature: Exercice clôturé — load status
   useEffect(() => {
     if (!workspaceId) return
@@ -800,27 +634,8 @@ export default function ExercicePage() {
     setCloturant(false)
   }
 
-  async function saveAnnotation() {
-    if (!workspaceId) return
-    setSavingAnnotation(true)
-    const supabase = createClient()
-    const annee = Number(debut.slice(0, 4))
-    await supabase.from('exercice_annotations').upsert(
-      { workspace_id: workspaceId, annee, contenu: annotation, updated_at: new Date().toISOString() },
-      { onConflict: 'workspace_id,annee' }
-    )
-    setAnnotationSaved(true)
-    setSavingAnnotation(false)
-  }
-
   const pnl   = useMemo(() => computePnL(factures, depenses, debut, fin),            [factures, depenses, debut, fin])
   const bilan = useMemo(() => computeBilan(factures, depenses, debut, fin, pnl.resultat), [factures, depenses, debut, fin, pnl.resultat])
-
-  // Feature: Tendance mensuelle
-  const monthly = useMemo(
-    () => computeMonthly(factures, depenses, debut, fin),
-    [factures, depenses, debut, fin]
-  )
 
   // Feature #7 — N-1 PnL
   const pnlN1 = useMemo(() => {
@@ -828,35 +643,6 @@ export default function ExercicePage() {
     const d2 = new Date(fin);   d2.setFullYear(d2.getFullYear() - 1)
     return computePnL(factures, depenses, d1.toISOString().slice(0, 10), d2.toISOString().slice(0, 10))
   }, [factures, depenses, debut, fin])
-
-  // Sprint 3 — Feature B: projection fin d'année
-  const isProjectable = useMemo(() => {
-    if (pnl.total_produits === 0) return false
-    const y = debut.slice(0, 4)
-    if (debut !== `${y}-01-01`) return false
-    if (fin >= `${y}-12-31`) return false
-    if (debut.slice(0, 4) !== fin.slice(0, 4)) return false
-    return true
-  }, [debut, fin, pnl.total_produits])
-
-  const projection = useMemo(() => {
-    if (!isProjectable) return null
-    const y = Number(debut.slice(0, 4))
-    const isLeap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0
-    const totalDays = isLeap ? 366 : 365
-    const d1 = new Date(debut + 'T00:00:00')
-    const d2 = new Date(fin + 'T00:00:00')
-    const elapsed = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000) + 1)
-    const factor = totalDays / elapsed
-    return {
-      produits: round2(pnl.total_produits * factor),
-      charges:  round2(pnl.total_charges  * factor),
-      resultat: round2(pnl.resultat       * factor),
-      elapsed,
-      totalDays,
-      pct: Math.round((elapsed / totalDays) * 100),
-    }
-  }, [isProjectable, debut, fin, pnl])
 
   // Period labels for compare header
   const labelN  = debut.slice(0, 4) === fin.slice(0, 4) ? debut.slice(0, 4) : `${debut.slice(0, 4)}–${fin.slice(0, 4)}`
@@ -994,171 +780,6 @@ export default function ExercicePage() {
             </div>
           )}
 
-          <div className="dash-kpi-grid">
-            <div className="dash-kpi-card">
-              <p className="dash-kpi-label">Produits HT</p>
-              <p className="dash-kpi-value">{formatEur(pnl.total_produits)}</p>
-              <p className="dash-kpi-sub">{debut} – {fin}</p>
-            </div>
-            <div className="dash-kpi-card">
-              <p className="dash-kpi-label">Charges HT</p>
-              <p className="dash-kpi-value">{formatEur(pnl.total_charges)}</p>
-              <p className="dash-kpi-sub">{debut} – {fin}</p>
-            </div>
-            {pnl.resultat >= 0
-              ? <div className="dash-kpi-card dash-kpi-card-credit">
-                  <p className="dash-kpi-label">Résultat</p>
-                  <p className="dash-kpi-value dash-kpi-value-success">{formatEur(pnl.resultat)}</p>
-                  <p className="dash-kpi-sub">Bénéfice</p>
-                </div>
-              : <div className="dash-kpi-card dash-kpi-card-due">
-                  <p className="dash-kpi-label">Résultat</p>
-                  <p className="dash-kpi-value dash-kpi-value-danger">{formatEur(pnl.resultat)}</p>
-                  <p className="dash-kpi-sub">Déficit</p>
-                </div>
-            }
-            {(() => {
-              const marge = pnl.total_produits > 0
-                ? Math.round((pnl.resultat / pnl.total_produits) * 100 * 10) / 10
-                : null
-              const margeColor = marge === null ? 'var(--pencil)'
-                : marge < 0 ? '#dc2626'
-                : marge < 15 ? '#d97706'
-                : '#15803d'
-              return (
-                <div className="dash-kpi-card">
-                  <p className="dash-kpi-label">Taux de marge</p>
-                  <p className="dash-kpi-value" style={{ color: margeColor }}>
-                    {marge === null ? '—' : `${marge} %`}
-                  </p>
-                  <p className="dash-kpi-sub">Résultat / CA HT</p>
-                </div>
-              )
-            })()}
-          </div>
-
-          <ExecSummary pnl={pnl} debut={debut} fin={fin} />
-
-          {/* Sprint 3 — Feature B: Projection fin d'année */}
-          {projection && (
-            <div className="dash-projection-banner no-print">
-              <div className="dash-projection-label">Projection fin d&apos;année</div>
-              <div className="dash-projection-body">
-                <span style={{ fontSize: 12, color: 'var(--pencil)' }}>
-                  Basé sur {projection.elapsed} j / {projection.totalDays} j ({projection.pct} % de l&apos;année écoulée) — extrapolation linéaire
-                </span>
-                <div className="dash-projection-values">
-                  <span>CA projeté : <strong style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(projection.produits)}</strong></span>
-                  <span>Charges : <strong style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(projection.charges)}</strong></span>
-                  <span style={{ color: projection.resultat >= 0 ? '#15803d' : '#dc2626' }}>
-                    Résultat projeté : <strong style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(projection.resultat)}</strong>
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Sprint 3 — Feature C: Annotation d'exercice */}
-          <div className="no-print" style={{ marginBottom: 16 }}>
-            <button
-              className="dash-btn-ghost"
-              onClick={() => setShowAnnotation(v => !v)}
-              style={{ fontSize: 12, marginBottom: showAnnotation ? 10 : 0 }}
-            >
-              {showAnnotation ? '▼' : '▶'} Notes d&apos;exercice {debut.slice(0, 4)}
-            </button>
-
-            {showAnnotation && workspaceId && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 600 }}>
-                <textarea
-                  className="dash-field-input"
-                  value={annotation}
-                  onChange={e => { setAnnotation(e.target.value); setAnnotationSaved(false) }}
-                  placeholder={`Observations sur l'exercice ${debut.slice(0, 4)} — décisions prises, contexte, objectifs…`}
-                  rows={4}
-                  style={{ resize: 'vertical', fontFamily: 'Inter, sans-serif', fontSize: 13 }}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <button
-                    className="dash-btn"
-                    onClick={saveAnnotation}
-                    disabled={savingAnnotation}
-                    style={{ fontSize: 12 }}
-                  >
-                    {savingAnnotation ? '…' : 'Enregistrer'}
-                  </button>
-                  {annotationSaved && (
-                    <span style={{ fontSize: 12, color: '#15803d', fontFamily: 'Courier Prime,monospace' }}>
-                      ✓ Enregistré
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Feature #16 — Ratios de gestion */}
-          <div className="no-print" style={{ marginBottom: 20 }}>
-            <button
-              className="dash-btn-ghost"
-              onClick={() => setShowRatios(v => !v)}
-              style={{ fontSize: 12, marginBottom: showRatios ? 12 : 0 }}
-            >
-              {showRatios ? '▼' : '▶'} Ratios de gestion
-            </button>
-
-            {showRatios && (() => {
-              const margeNette = pnl.total_produits > 0
-                ? Math.round((pnl.resultat / pnl.total_produits) * 1000) / 10
-                : null
-              const chargesSurCA = pnl.total_produits > 0
-                ? Math.round((pnl.total_charges / pnl.total_produits) * 1000) / 10
-                : null
-              const bfr = round2(bilan.creances_clients - bilan.dettes_fournisseurs)
-
-              return (
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {/* Marge nette */}
-                  <div className="dash-ratio-card">
-                    <div className="dash-ratio-label">Marge nette</div>
-                    <div className="dash-ratio-value" style={{
-                      color: margeNette === null ? 'var(--pencil)'
-                        : margeNette < 0 ? '#dc2626'
-                        : margeNette < 15 ? '#d97706'
-                        : '#15803d'
-                    }}>
-                      {margeNette === null ? '—' : `${margeNette} %`}
-                    </div>
-                    <div className="dash-ratio-desc">Résultat / CA HT</div>
-                  </div>
-
-                  {/* Charges / CA */}
-                  <div className="dash-ratio-card">
-                    <div className="dash-ratio-label">Charges / CA</div>
-                    <div className="dash-ratio-value" style={{
-                      color: chargesSurCA === null ? 'var(--pencil)'
-                        : chargesSurCA > 90 ? '#dc2626'
-                        : chargesSurCA > 75 ? '#d97706'
-                        : '#15803d'
-                    }}>
-                      {chargesSurCA === null ? '—' : `${chargesSurCA} %`}
-                    </div>
-                    <div className="dash-ratio-desc">Charges HT / CA HT</div>
-                  </div>
-
-                  {/* BFR */}
-                  <div className="dash-ratio-card">
-                    <div className="dash-ratio-label">BFR simplifié</div>
-                    <div className="dash-ratio-value" style={{ color: bfr > 0 ? '#d97706' : '#15803d' }}>
-                      {formatEur(bfr)}
-                    </div>
-                    <div className="dash-ratio-desc">Créances – Dettes fournisseurs</div>
-                  </div>
-                </div>
-              )
-            })()}
-          </div>
-
           <div role="tablist" aria-label="Vues des comptes annuels" className="dash-pill-tabs no-print">
             <button
               role="tab"
@@ -1179,16 +800,6 @@ export default function ExercicePage() {
               onClick={() => handleTab('bilan')}
             >
               Bilan simplifié
-            </button>
-            <button
-              role="tab"
-              id="tab-tendance"
-              aria-selected={tab === 'tendance'}
-              aria-controls="tabpanel-tendance"
-              className={`dash-pill-tab${tab === 'tendance' ? ' dash-pill-tab-active' : ''}`}
-              onClick={() => handleTab('tendance')}
-            >
-              Tendance mensuelle
             </button>
           </div>
 
@@ -1409,19 +1020,6 @@ export default function ExercicePage() {
           {/* ── Bilan ───────────────────────────────────────────────────── */}
           <div role="tabpanel" id="tabpanel-bilan" aria-labelledby="tab-bilan">
             {tab === 'bilan' && <BilanTab debut={debut} fin={fin} bilan={bilan} vueComptable={vueComptable} />}
-          </div>
-
-          {/* ── Tendance mensuelle ───────────────────────────────────────── */}
-          <div role="tabpanel" id="tabpanel-tendance" aria-labelledby="tab-tendance">
-            {tab === 'tendance' && (
-              <div className="dash-section">
-                <TendanceChart monthly={monthly} />
-                <p style={{ marginTop: 12, fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)' }}>
-                  Barres bleues = produits HT · Barres ambrées = charges HT · Ligne verte pointillée = résultat mensuel.
-                  Les catégories de bilan (Cl. 1, Cl. 2, 455, 58) sont exclues.
-                </p>
-              </div>
-            )}
           </div>
         </>
       )}
