@@ -188,6 +188,18 @@ function exportCSV(pnl: PnL, debut: string, fin: string) {
   URL.revokeObjectURL(url)
 }
 
+// ── Delta helper (Feature #7) ─────────────────────────────────────────────────
+
+function DeltaCell({ n, n1 }: { n: number; n1: number }) {
+  if (n === 0 && n1 === 0) {
+    return <td className="right dash-delta-nil">—</td>
+  }
+  const pct = Math.round(((n - n1) / (n1 || 1)) * 1000) / 10
+  const cls = pct > 0 ? 'dash-delta-pos' : pct < 0 ? 'dash-delta-neg' : 'dash-delta-nil'
+  const label = pct > 0 ? `+${pct} %` : pct < 0 ? `${pct} %` : '—'
+  return <td className={`right ${cls}`}>{label}</td>
+}
+
 // ── Bilan sub-components ──────────────────────────────────────────────────────
 
 function Ref({ v, show = true }: { v: string; show?: boolean }) {
@@ -261,6 +273,96 @@ function ExecSummary({ pnl, debut, fin }: { pnl: PnL; debut: string; fin: string
       <span className="dash-exec-icon">{pnl.resultat >= 0 ? '↗' : '↘'}</span>
       <p className="dash-exec-text">{text}</p>
     </div>
+  )
+}
+
+// ── DrillDrawer (Feature #8) ──────────────────────────────────────────────────
+
+function DrillDrawer({
+  cat, debut, fin, factures, depenses, onClose
+}: {
+  cat: string; debut: string; fin: string
+  factures: Facture[]; depenses: Depense[]; onClose: () => void
+}) {
+  const rows = useMemo(() => {
+    const ff = factures
+      .filter(f => f.date >= debut && f.date <= fin && f.categorie === cat)
+      .map(f => ({ id: f.id, date: f.date, tiers: f.client, montant_ht: f.montant_ht, statut: f.statut, kind: 'facture' as const }))
+    const dd = depenses
+      .filter(d => d.date >= debut && d.date <= fin && d.categorie === cat)
+      .map(d => ({ id: d.id, date: d.date, tiers: d.fournisseur, montant_ht: d.montant_ht, statut: d.statut, kind: 'depense' as const }))
+    return [...ff, ...dd].sort((a, b) => b.date.localeCompare(a.date))
+  }, [cat, debut, fin, factures, depenses])
+
+  const total = round2(rows.reduce((s, r) => s + r.montant_ht, 0))
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 400 }}
+      />
+      {/* Drawer */}
+      <aside style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 480,
+        background: 'var(--paper)', borderLeft: '1px solid var(--rule)',
+        zIndex: 401, display: 'flex', flexDirection: 'column',
+        boxShadow: '-4px 0 24px rgba(0,0,0,0.08)',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div>
+            <div style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--pencil)', marginBottom: 4 }}>Détail</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>{cat}</div>
+            <div style={{ fontSize: 12, color: 'var(--pencil)', marginTop: 4 }}>{debut} – {fin} · {rows.length} transaction{rows.length > 1 ? 's' : ''}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--pencil)', padding: '4px 6px', lineHeight: 1 }} aria-label="Fermer">✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 20px' }}>
+          {rows.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace', fontSize: 13 }}>
+              Aucune transaction sur cette période.
+            </div>
+          ) : (
+            <table className="dash-table" style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Tiers</th>
+                  <th scope="col" className="right">Montant HT</th>
+                  <th scope="col">Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={`${r.kind}-${r.id}`}>
+                    <td style={{ fontFamily: 'Courier Prime,monospace', fontSize: 12, whiteSpace: 'nowrap' }}>
+                      {new Date(r.date + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                    </td>
+                    <td style={{ fontSize: 13 }}>{r.tiers}</td>
+                    <td className="right" style={{ fontFamily: 'Courier Prime,monospace', fontSize: 13 }}>{formatEur(r.montant_ht)}</td>
+                    <td>
+                      <span className={`dash-badge ${r.statut === 'payee' ? 'dash-badge-green' : 'dash-badge-orange'}`} style={{ fontSize: 10 }}>
+                        {r.statut === 'payee' ? 'Payée' : 'En attente'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontFamily: 'Courier Prime,monospace', fontSize: 12, color: 'var(--pencil)' }}>Total HT</span>
+          <span style={{ fontFamily: 'Courier Prime,monospace', fontWeight: 700, fontSize: 15 }}>{formatEur(total)}</span>
+        </div>
+      </aside>
+    </>
   )
 }
 
@@ -384,7 +486,7 @@ function BilanTab({ debut, fin, bilan, vueComptable }: { debut: string; fin: str
       </div>
 
       <p style={{ marginTop: 12, fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)', lineHeight: 1.7 }}>
-        Calculé depuis vos transactions · Période {debut} – {fin} pour le résultat et le fonds de roulement · Cumulatif depuis l'origine pour le bilan patrimonial.
+        Calculé depuis vos transactions · Période {debut} – {fin} pour le résultat et le fonds de roulement · Cumulatif depuis l&apos;origine pour le bilan patrimonial.
         TVA collectée {formatEur(bilan.tva_collectee)} · TVA déductible {formatEur(bilan.tva_deductible)}.
         Pour équilibrer le bilan, catégorisez apports en capital (101), emprunts (164), immobilisations (2051, 2052, 213…).
       </p>
@@ -406,6 +508,15 @@ export default function ExercicePage() {
   const [fin, setFin]           = useState(today())
   const [tab, setTab]           = useState<Tab>('resultat')
   const [activePreset, setActivePreset] = useState<number | null>(0)
+
+  // Feature #7 — N vs N-1 compare mode
+  const [compareMode, setCompareMode] = useState(false)
+
+  // Feature #8 — Drill-down drawer
+  const [drillCat, setDrillCat] = useState<string | null>(null)
+
+  // Feature #16 — Ratios de gestion
+  const [showRatios, setShowRatios] = useState(false)
 
   const [vueComptable, setVueComptable] = useState(() => {
     try { return JSON.parse(localStorage.getItem('exercice_vue_comptable') ?? 'false') } catch { return false }
@@ -437,11 +548,20 @@ export default function ExercicePage() {
   function applyPreset(i: number) {
     const p = ps[i]
     setDebut(p.debut); setFin(p.fin); setActivePreset(i)
+    if (drillCat) setDrillCat(null)
     persist({ debut: p.debut, fin: p.fin, tab, activePreset: i })
   }
-  function handleDebut(v: string) { setDebut(v); setActivePreset(null); persist({ debut: v, fin, tab, activePreset: null }) }
-  function handleFin(v: string)   { setFin(v);   setActivePreset(null); persist({ debut, fin: v, tab, activePreset: null }) }
-  function handleTab(t: Tab)      { setTab(t); persist({ debut, fin, tab: t, activePreset }) }
+  function handleDebut(v: string) {
+    setDebut(v); setActivePreset(null)
+    if (drillCat) setDrillCat(null)
+    persist({ debut: v, fin, tab, activePreset: null })
+  }
+  function handleFin(v: string) {
+    setFin(v); setActivePreset(null)
+    if (drillCat) setDrillCat(null)
+    persist({ debut, fin: v, tab, activePreset: null })
+  }
+  function handleTab(t: Tab) { setTab(t); persist({ debut, fin, tab: t, activePreset }) }
 
   useEffect(() => {
     const supabase = createClient()
@@ -466,6 +586,17 @@ export default function ExercicePage() {
   const pnl   = useMemo(() => computePnL(factures, depenses, debut, fin),            [factures, depenses, debut, fin])
   const bilan = useMemo(() => computeBilan(factures, depenses, debut, fin, pnl.resultat), [factures, depenses, debut, fin, pnl.resultat])
 
+  // Feature #7 — N-1 PnL
+  const pnlN1 = useMemo(() => {
+    const d1 = new Date(debut); d1.setFullYear(d1.getFullYear() - 1)
+    const d2 = new Date(fin);   d2.setFullYear(d2.getFullYear() - 1)
+    return computePnL(factures, depenses, d1.toISOString().slice(0, 10), d2.toISOString().slice(0, 10))
+  }, [factures, depenses, debut, fin])
+
+  // Period labels for compare header
+  const labelN  = debut.slice(0, 4) === fin.slice(0, 4) ? debut.slice(0, 4) : `${debut.slice(0, 4)}–${fin.slice(0, 4)}`
+  const labelN1 = String(Number(debut.slice(0, 4)) - 1)
+
   return (
     <div className="dash-page">
       <div className="dash-header">
@@ -485,6 +616,14 @@ export default function ExercicePage() {
             title={vueComptable ? 'Masquer les références fiscales' : 'Afficher les références fiscales (mode comptable)'}
           >
             {vueComptable ? '◆ Vue comptable' : '◇ Vue comptable'}
+          </button>
+          <button
+            className="dash-btn-ghost"
+            onClick={() => setCompareMode(v => !v)}
+            style={{ fontSize: 11 }}
+            title="Comparer avec la même période N-1"
+          >
+            {compareMode ? '◆ N vs N-1' : '◇ N vs N-1'}
           </button>
           <button
             className="dash-btn-ghost"
@@ -587,6 +726,68 @@ export default function ExercicePage() {
 
           <ExecSummary pnl={pnl} debut={debut} fin={fin} />
 
+          {/* Feature #16 — Ratios de gestion */}
+          <div className="no-print" style={{ marginBottom: 20 }}>
+            <button
+              className="dash-btn-ghost"
+              onClick={() => setShowRatios(v => !v)}
+              style={{ fontSize: 12, marginBottom: showRatios ? 12 : 0 }}
+            >
+              {showRatios ? '▼' : '▶'} Ratios de gestion
+            </button>
+
+            {showRatios && (() => {
+              const margeNette = pnl.total_produits > 0
+                ? Math.round((pnl.resultat / pnl.total_produits) * 1000) / 10
+                : null
+              const chargesSurCA = pnl.total_produits > 0
+                ? Math.round((pnl.total_charges / pnl.total_produits) * 1000) / 10
+                : null
+              const bfr = round2(bilan.creances_clients - bilan.dettes_fournisseurs)
+
+              return (
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {/* Marge nette */}
+                  <div className="dash-ratio-card">
+                    <div className="dash-ratio-label">Marge nette</div>
+                    <div className="dash-ratio-value" style={{
+                      color: margeNette === null ? 'var(--pencil)'
+                        : margeNette < 0 ? '#dc2626'
+                        : margeNette < 15 ? '#d97706'
+                        : '#15803d'
+                    }}>
+                      {margeNette === null ? '—' : `${margeNette} %`}
+                    </div>
+                    <div className="dash-ratio-desc">Résultat / CA HT</div>
+                  </div>
+
+                  {/* Charges / CA */}
+                  <div className="dash-ratio-card">
+                    <div className="dash-ratio-label">Charges / CA</div>
+                    <div className="dash-ratio-value" style={{
+                      color: chargesSurCA === null ? 'var(--pencil)'
+                        : chargesSurCA > 90 ? '#dc2626'
+                        : chargesSurCA > 75 ? '#d97706'
+                        : '#15803d'
+                    }}>
+                      {chargesSurCA === null ? '—' : `${chargesSurCA} %`}
+                    </div>
+                    <div className="dash-ratio-desc">Charges HT / CA HT</div>
+                  </div>
+
+                  {/* BFR */}
+                  <div className="dash-ratio-card">
+                    <div className="dash-ratio-label">BFR simplifié</div>
+                    <div className="dash-ratio-value" style={{ color: bfr > 0 ? '#d97706' : '#15803d' }}>
+                      {formatEur(bfr)}
+                    </div>
+                    <div className="dash-ratio-desc">Créances – Dettes fournisseurs</div>
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+
           <div role="tablist" aria-label="Vues des comptes annuels" className="dash-pill-tabs no-print">
             <button
               role="tab"
@@ -614,70 +815,209 @@ export default function ExercicePage() {
           <div role="tabpanel" id="tabpanel-resultat" aria-labelledby="tab-resultat">
             {tab === 'resultat' && (
               <div className="dash-section">
-                <div className="dash-table-wrap"><table className="dash-table">
-                  <caption className="sr-only">Compte de résultat — Produits et charges de la période {debut} au {fin}</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Libellé</th>
-                      <th scope="col" className="right">Montant HT</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr style={{ background: 'var(--offwhite)' }}>
-                      <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
-                        textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
-                        borderTop: '1px solid var(--rule)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Produits — Chiffre d&apos;affaires HT</span>
-                          <Ref v="Formulaire 2052" show={vueComptable} />
-                        </div>
-                      </td>
-                    </tr>
-                    {Object.entries(pnl.produits).map(([cat, montant]) => (
-                      <tr key={cat}>
-                        <td style={{ paddingLeft: 24 }}>{cat}</td>
-                        <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(montant)}</td>
-                      </tr>
-                    ))}
-                    {Object.keys(pnl.produits).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucun produit sur cette période.</td></tr>}
-                    <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
-                      <td>Total produits <Ref v="2052 · FJ" show={vueComptable} /></td>
-                      <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_produits)}</td>
-                    </tr>
+                <div className="dash-table-wrap">
+                  {compareMode ? (
+                    /* ── 4-column compare table (Feature #7) ── */
+                    <table className="dash-table">
+                      <caption className="sr-only">
+                        Comparaison N vs N-1 — Compte de résultat {debut} au {fin} et période équivalente N-1
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Catégorie</th>
+                          <th scope="col" className="right">N ({labelN})</th>
+                          <th scope="col" className="right">N-1 ({labelN1})</th>
+                          <th scope="col" className="right">Δ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Produits header */}
+                        <tr style={{ background: 'var(--offwhite)' }}>
+                          <td colSpan={4} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
+                            textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
+                            borderTop: '1px solid var(--rule)' }}>
+                            Produits — Chiffre d&apos;affaires HT
+                          </td>
+                        </tr>
+                        {/* Produits rows */}
+                        {Array.from(new Set([...Object.keys(pnl.produits), ...Object.keys(pnlN1.produits)])).map(cat => {
+                          const n  = pnl.produits[cat]   ?? 0
+                          const n1 = pnlN1.produits[cat] ?? 0
+                          return (
+                            <tr
+                              key={cat}
+                              onClick={() => setDrillCat(cat)}
+                              style={{ cursor: 'pointer' }}
+                              className="dash-row-clickable"
+                            >
+                              <td style={{ paddingLeft: 24 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span>{cat}</span>
+                                  <ChevronRight size={12} style={{ color: 'var(--pencil)', opacity: 0.5 }} />
+                                </div>
+                              </td>
+                              <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(n)}</td>
+                              <td className="right" style={{ fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)' }}>{formatEur(n1)}</td>
+                              <DeltaCell n={n} n1={n1} />
+                            </tr>
+                          )
+                        })}
+                        {Object.keys(pnl.produits).length === 0 && Object.keys(pnlN1.produits).length === 0 && (
+                          <tr><td colSpan={4} className="dash-empty">Aucun produit sur ces périodes.</td></tr>
+                        )}
+                        {/* Total produits */}
+                        <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
+                          <td>Total produits</td>
+                          <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_produits)}</td>
+                          <td className="right" style={{ fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)' }}>{formatEur(pnlN1.total_produits)}</td>
+                          <DeltaCell n={pnl.total_produits} n1={pnlN1.total_produits} />
+                        </tr>
 
-                    <tr style={{ background: 'var(--offwhite)' }}>
-                      <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
-                        textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
-                        borderTop: '1px solid var(--rule)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Charges — Dépenses HT</span>
-                          <Ref v="Formulaire 2052" show={vueComptable} />
-                        </div>
-                      </td>
-                    </tr>
-                    {Object.entries(pnl.charges).map(([cat, montant]) => (
-                      <tr key={cat}>
-                        <td style={{ paddingLeft: 24 }}>{cat}</td>
-                        <td className="right" style={{ color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace' }}>{formatEur(montant)}</td>
-                      </tr>
-                    ))}
-                    {Object.keys(pnl.charges).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucune charge sur cette période.</td></tr>}
-                    <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
-                      <td>Total charges <Ref v="2052 · GM" show={vueComptable} /></td>
-                      <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_charges)}</td>
-                    </tr>
+                        {/* Charges header */}
+                        <tr style={{ background: 'var(--offwhite)' }}>
+                          <td colSpan={4} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
+                            textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
+                            borderTop: '1px solid var(--rule)' }}>
+                            Charges — Dépenses HT
+                          </td>
+                        </tr>
+                        {/* Charges rows */}
+                        {Array.from(new Set([...Object.keys(pnl.charges), ...Object.keys(pnlN1.charges)])).map(cat => {
+                          const n  = pnl.charges[cat]   ?? 0
+                          const n1 = pnlN1.charges[cat] ?? 0
+                          return (
+                            <tr
+                              key={cat}
+                              onClick={() => setDrillCat(cat)}
+                              style={{ cursor: 'pointer' }}
+                              className="dash-row-clickable"
+                            >
+                              <td style={{ paddingLeft: 24 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span>{cat}</span>
+                                  <ChevronRight size={12} style={{ color: 'var(--pencil)', opacity: 0.5 }} />
+                                </div>
+                              </td>
+                              <td className="right" style={{ fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)' }}>{formatEur(n)}</td>
+                              <td className="right" style={{ fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)' }}>{formatEur(n1)}</td>
+                              <DeltaCell n={n} n1={n1} />
+                            </tr>
+                          )
+                        })}
+                        {Object.keys(pnl.charges).length === 0 && Object.keys(pnlN1.charges).length === 0 && (
+                          <tr><td colSpan={4} className="dash-empty">Aucune charge sur ces périodes.</td></tr>
+                        )}
+                        {/* Total charges */}
+                        <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
+                          <td>Total charges</td>
+                          <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_charges)}</td>
+                          <td className="right" style={{ fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)' }}>{formatEur(pnlN1.total_charges)}</td>
+                          <DeltaCell n={pnl.total_charges} n1={pnlN1.total_charges} />
+                        </tr>
 
-                    <tr style={{ fontWeight: 700, fontFamily: 'Courier Prime,monospace', background: pnl.resultat >= 0 ? '#f0fdf4' : '#fff5f5' }}>
-                      <td style={{ padding: '14px 12px', fontSize: 15 }}>
-                        Résultat net de l&apos;exercice {pnl.resultat >= 0 ? '(120)' : '(129)'}
-                        <Ref v="2053 · KG/KH" show={vueComptable} />
-                      </td>
-                      <td className="right" style={{ padding: '14px 12px', fontSize: 15, color: pnl.resultat >= 0 ? '#15803d' : '#dc2626' }}>
-                        {formatEur(pnl.resultat)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table></div>
+                        {/* Résultat */}
+                        <tr style={{ fontWeight: 700, fontFamily: 'Courier Prime,monospace', background: pnl.resultat >= 0 ? '#f0fdf4' : '#fff5f5' }}>
+                          <td style={{ padding: '14px 12px', fontSize: 15 }}>
+                            Résultat net de l&apos;exercice
+                          </td>
+                          <td className="right" style={{ padding: '14px 12px', fontSize: 15, color: pnl.resultat >= 0 ? '#15803d' : '#dc2626' }}>
+                            {formatEur(pnl.resultat)}
+                          </td>
+                          <td className="right" style={{ padding: '14px 12px', fontSize: 15, color: pnlN1.resultat >= 0 ? '#15803d' : '#dc2626' }}>
+                            {formatEur(pnlN1.resultat)}
+                          </td>
+                          <DeltaCell n={pnl.resultat} n1={pnlN1.resultat} />
+                        </tr>
+                      </tbody>
+                    </table>
+                  ) : (
+                    /* ── Standard 2-column table ── */
+                    <table className="dash-table">
+                      <caption className="sr-only">Compte de résultat — Produits et charges de la période {debut} au {fin}</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Libellé</th>
+                          <th scope="col" className="right">Montant HT</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr style={{ background: 'var(--offwhite)' }}>
+                          <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
+                            textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
+                            borderTop: '1px solid var(--rule)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Produits — Chiffre d&apos;affaires HT</span>
+                              <Ref v="Formulaire 2052" show={vueComptable} />
+                            </div>
+                          </td>
+                        </tr>
+                        {Object.entries(pnl.produits).map(([cat, montant]) => (
+                          <tr
+                            key={cat}
+                            onClick={() => setDrillCat(cat)}
+                            style={{ cursor: 'pointer' }}
+                            className="dash-row-clickable"
+                          >
+                            <td style={{ paddingLeft: 24 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>{cat}</span>
+                                <ChevronRight size={12} style={{ color: 'var(--pencil)', opacity: 0.5 }} />
+                              </div>
+                            </td>
+                            <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(montant)}</td>
+                          </tr>
+                        ))}
+                        {Object.keys(pnl.produits).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucun produit sur cette période.</td></tr>}
+                        <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
+                          <td>Total produits <Ref v="2052 · FJ" show={vueComptable} /></td>
+                          <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_produits)}</td>
+                        </tr>
+
+                        <tr style={{ background: 'var(--offwhite)' }}>
+                          <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
+                            textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
+                            borderTop: '1px solid var(--rule)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Charges — Dépenses HT</span>
+                              <Ref v="Formulaire 2052" show={vueComptable} />
+                            </div>
+                          </td>
+                        </tr>
+                        {Object.entries(pnl.charges).map(([cat, montant]) => (
+                          <tr
+                            key={cat}
+                            onClick={() => setDrillCat(cat)}
+                            style={{ cursor: 'pointer' }}
+                            className="dash-row-clickable"
+                          >
+                            <td style={{ paddingLeft: 24 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>{cat}</span>
+                                <ChevronRight size={12} style={{ color: 'var(--pencil)', opacity: 0.5 }} />
+                              </div>
+                            </td>
+                            <td className="right" style={{ color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace' }}>{formatEur(montant)}</td>
+                          </tr>
+                        ))}
+                        {Object.keys(pnl.charges).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucune charge sur cette période.</td></tr>}
+                        <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
+                          <td>Total charges <Ref v="2052 · GM" show={vueComptable} /></td>
+                          <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_charges)}</td>
+                        </tr>
+
+                        <tr style={{ fontWeight: 700, fontFamily: 'Courier Prime,monospace', background: pnl.resultat >= 0 ? '#f0fdf4' : '#fff5f5' }}>
+                          <td style={{ padding: '14px 12px', fontSize: 15 }}>
+                            Résultat net de l&apos;exercice {pnl.resultat >= 0 ? '(120)' : '(129)'}
+                            <Ref v="2053 · KG/KH" show={vueComptable} />
+                          </td>
+                          <td className="right" style={{ padding: '14px 12px', fontSize: 15, color: pnl.resultat >= 0 ? '#15803d' : '#dc2626' }}>
+                            {formatEur(pnl.resultat)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  )}
+                </div>
                 <p style={{ marginTop: 12, fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)' }}>
                   Les mouvements de capitaux (Cl. 1), immobilisations (Cl. 2) et virements internes (58) sont exclus du compte de résultat — ils figurent au Bilan.
                 </p>
@@ -690,6 +1030,18 @@ export default function ExercicePage() {
             {tab === 'bilan' && <BilanTab debut={debut} fin={fin} bilan={bilan} vueComptable={vueComptable} />}
           </div>
         </>
+      )}
+
+      {/* Feature #8 — Drill-down drawer */}
+      {drillCat && (
+        <DrillDrawer
+          cat={drillCat}
+          debut={debut}
+          fin={fin}
+          factures={factures}
+          depenses={depenses}
+          onClose={() => setDrillCat(null)}
+        />
       )}
     </div>
   )

@@ -1811,3 +1811,39 @@ body {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* ── Sprint 2 — Feature #7: Comparison table ─────────────────────────────── */
+.dash-delta-pos { color: #15803d; font-family: 'Courier Prime', monospace; }
+.dash-delta-neg { color: #dc2626; font-family: 'Courier Prime', monospace; }
+.dash-delta-nil { color: var(--pencil); font-family: 'Courier Prime', monospace; }
+
+/* ── Sprint 2 — Feature #8: Clickable rows ───────────────────────────────── */
+.dash-row-clickable:hover { background: var(--hover); cursor: pointer; }
+
+/* ── Sprint 2 — Feature #16: Ratio cards ────────────────────────────────── */
+.dash-ratio-card {
+  padding: 14px 18px;
+  background: var(--offwhite);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  min-width: 160px;
+}
+.dash-ratio-label {
+  font-family: 'Courier Prime', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--pencil);
+  margin-bottom: 6px;
+}
+.dash-ratio-value {
+  font-family: 'Courier Prime', monospace;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.dash-ratio-desc {
+  font-size: 11px;
+  color: var(--pencil);
+}
