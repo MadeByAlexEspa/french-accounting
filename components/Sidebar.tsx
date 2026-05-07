@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Workspace } from '@/lib/types/database'
-import { PenLine, Menu, X, Home, ArrowLeftRight, Percent, BookOpen, Receipt, Plug, Settings, LogOut } from 'lucide-react'
+import { PenLine, Menu, X, Home, ArrowLeftRight, Percent, BookOpen, Receipt, Settings, LogOut } from 'lucide-react'
 import { TvaAlertBadge } from '@/components/TvaAlertBadge'
 
 const NAV_MAIN = [
@@ -17,8 +17,7 @@ const NAV_MAIN = [
 ]
 
 const NAV_FOOTER = [
-  { href: '/integrations', label: 'Connexions API', icon: Plug },
-  { href: '/workspace',    label: 'Paramètres',     icon: Settings },
+  { href: '/workspace', label: 'Paramètres', icon: Settings },
 ]
 
 interface Props {

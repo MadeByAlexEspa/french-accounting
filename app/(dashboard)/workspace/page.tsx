@@ -4,10 +4,11 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Settings, Users, User, AlertTriangle, Copy, Check, X,
-  RefreshCw, Send, ChevronDown,
+  RefreshCw, Send, ChevronDown, Plug,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Workspace } from '@/lib/types/database'
+import { ConnexionsSection } from '@/components/ConnexionsSection'
 import {
   createInvitation,
   listInvitations,
@@ -46,7 +47,7 @@ const STRUCTURE_OPTIONS = [
 
 const AVATAR_COLORS = ['#fef3c7', '#dbeafe', '#dcfce7', '#fce7f3', '#e0e7ff', '#f3f4f6']
 
-type Section = 'workspace' | 'equipe' | 'compte' | 'danger'
+type Section = 'workspace' | 'equipe' | 'compte' | 'connexions' | 'danger'
 
 interface WorkspaceData extends Workspace {
   members: MemberRow[]
@@ -159,6 +160,13 @@ export default function WorkspacePage() {
               <button className={`settings-nav-item${activeSection === 'equipe' ? ' settings-nav-item-active' : ''}`} onClick={() => setActiveSection('equipe')} aria-current={activeSection === 'equipe' ? 'page' : undefined}>
                 <Users size={15} aria-hidden="true" /> Équipe ({ws.members.length})
               </button>
+              <button
+                className={`settings-nav-item${activeSection === 'connexions' ? ' settings-nav-item-active' : ''}`}
+                onClick={() => setActiveSection('connexions')}
+                aria-current={activeSection === 'connexions' ? 'page' : undefined}
+              >
+                <Plug size={15} aria-hidden="true" /> Connexions API
+              </button>
 
               <span className="settings-nav-group">Mon compte</span>
               <button className={`settings-nav-item${activeSection === 'compte' ? ' settings-nav-item-active' : ''}`} onClick={() => setActiveSection('compte')} aria-current={activeSection === 'compte' ? 'page' : undefined}>
@@ -178,6 +186,7 @@ export default function WorkspacePage() {
             <div className="settings-content">
               {activeSection === 'workspace' && <WorkspaceSection ws={ws} onSaved={load} />}
               {activeSection === 'equipe' && <EquipeSection ws={ws} currentUserId={userId} currentUserRole={userRole} onChanged={load} />}
+              {activeSection === 'connexions' && <ConnexionsSection />}
               {activeSection === 'compte' && <CompteSection userEmail={userEmail} userName={userName} />}
               {activeSection === 'danger' && isOwner && <DangerSection workspaceId={ws.id} />}
             </div>
