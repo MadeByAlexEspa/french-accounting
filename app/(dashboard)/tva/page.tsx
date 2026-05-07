@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Copy, Check, X, AlertTriangle, ChevronRight } from 'lucide-react'
+import { Copy, Check, X, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Facture, Depense } from '@/lib/types/database'
 import { isTvaErronnee, getTvaAlertLabel } from '@/lib/tva-validation'
 
@@ -517,6 +517,8 @@ export default function TVAPage() {
   const [dTaux, setDTaux]       = useState('')
   const [splitTarget, setSplitTarget] = useState<TvaRow | null>(null)
   const [deductibleModal, setDeductibleModal] = useState<string | null>(null)
+  const [fPage, setFPage] = useState(0)
+  const [dPage, setDPage] = useState(0)
 
   // Restore period from localStorage after hydration
   useEffect(() => {
@@ -600,6 +602,7 @@ export default function TVAPage() {
   // ── Filtered detail rows ────────────────────────────────────────────────────
 
   const ff = useMemo(() => {
+    setFPage(0)
     let rows = data.detail_factures.map(f => ({ ...f, _kind: 'entree' as const }))
     if (fSearch) { const q = fSearch.toLowerCase(); rows = rows.filter(r => r.client.toLowerCase().includes(q)) }
     if (fTaux) rows = rows.filter(r => String(r.taux_tva) === fTaux)
@@ -607,6 +610,7 @@ export default function TVAPage() {
   }, [data.detail_factures, fSearch, fTaux])
 
   const fd = useMemo(() => {
+    setDPage(0)
     let rows = data.detail_depenses.map(d => ({ ...d, _kind: 'sortie' as const }))
     if (dSearch) { const q = dSearch.toLowerCase(); rows = rows.filter(r => r.fournisseur.toLowerCase().includes(q)) }
     if (dTaux) rows = rows.filter(r => String(r.taux_tva) === dTaux)
@@ -704,6 +708,8 @@ export default function TVAPage() {
             </div>
           </div>
 
+          <CA3Section data={data} debut={debut} fin={fin} />
+
           {/* ── Entrées ──────────────────────────────────────────────────────── */}
           <div className="dash-section">
             <div className="dash-section-title">Entrées <span className="dash-section-count">{ff.length} / {data.detail_factures.length}</span></div>
@@ -719,49 +725,64 @@ export default function TVAPage() {
             {data.detail_factures.length === 0
               ? <p className="dash-empty">Aucune entrée sur cette période.</p>
               : (
-                <div className="dash-table-wrap"><table className="dash-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th><th>Client</th>
-                      <th className="right">HT</th>
-                      <th className="center">Taux</th>
-                      <th className="right">TVA</th>
-                      <th className="right">TTC</th>
-                      <th className="center">📎</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ff.slice(0, 10).map(f => {
-                      const erreur = isTvaErronnee(f)
-                      return (
-                      <tr key={f.id} style={erreur ? { background: 'rgba(239,68,68,0.06)' } : undefined}>
-                        <td>{f.date}</td>
-                        <td>
-                          {f.client}
-                          {erreur && (
-                            <span title={getTvaAlertLabel(f)} style={{ marginLeft: 6, color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'default' }}>
-                              ⚠ {getTvaAlertLabel(f)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="right">{formatEur(f.montant_ht)}</td>
-                        <td className="center">
-                          <TauxCell row={f} onSave={handleCellSave} onSplitClick={() => setSplitTarget(f)} />
-                        </td>
-                        <td className="right">
-                          <EditableCell row={f} field="montant_tva" display={formatEur(f.montant_tva)} onSave={handleCellSave} />
-                        </td>
-                        <td className="right">
-                          <EditableCell row={f} field="montant_ttc" display={<strong>{formatEur(f.montant_ttc)}</strong>} onSave={handleCellSave} />
-                        </td>
-                        <td className="center" style={{ fontSize: 12, color: f.has_attachment ? '#16a34a' : 'var(--pencil)' }}>
-                          {f.bank_source ? (f.has_attachment ? '📎' : '—') : null}
-                        </td>
+                <>
+                  <div className="dash-table-wrap"><table className="dash-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th><th>Client</th>
+                        <th className="right">HT</th>
+                        <th className="center">Taux</th>
+                        <th className="right">TVA</th>
+                        <th className="right">TTC</th>
+                        <th className="center">📎</th>
                       </tr>
-                      )
-                    })}
-                  </tbody>
-                </table></div>
+                    </thead>
+                    <tbody>
+                      {ff.slice(fPage * 10, fPage * 10 + 10).map(f => {
+                        const erreur = isTvaErronnee(f)
+                        return (
+                        <tr key={f.id} style={erreur ? { background: 'rgba(239,68,68,0.06)' } : undefined}>
+                          <td>{f.date}</td>
+                          <td>
+                            {f.client}
+                            {erreur && (
+                              <span title={getTvaAlertLabel(f)} style={{ marginLeft: 6, color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'default' }}>
+                                ⚠ {getTvaAlertLabel(f)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="right">{formatEur(f.montant_ht)}</td>
+                          <td className="center">
+                            <TauxCell row={f} onSave={handleCellSave} onSplitClick={() => setSplitTarget(f)} />
+                          </td>
+                          <td className="right">
+                            <EditableCell row={f} field="montant_tva" display={formatEur(f.montant_tva)} onSave={handleCellSave} />
+                          </td>
+                          <td className="right">
+                            <EditableCell row={f} field="montant_ttc" display={<strong>{formatEur(f.montant_ttc)}</strong>} onSave={handleCellSave} />
+                          </td>
+                          <td className="center" style={{ fontSize: 12, color: f.has_attachment ? '#16a34a' : 'var(--pencil)' }}>
+                            {f.bank_source ? (f.has_attachment ? '📎' : '—') : null}
+                          </td>
+                        </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table></div>
+                  {ff.length > 10 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
+                      <button className="dash-btn-ghost" style={{ padding: '3px 10px' }} disabled={fPage === 0} onClick={() => setFPage(p => p - 1)}>
+                        <ChevronLeft size={14} />
+                      </button>
+                      <span style={{ fontSize: 12, color: 'var(--pencil)' }}>
+                        {fPage + 1} / {Math.ceil(ff.length / 10)}
+                      </span>
+                      <button className="dash-btn-ghost" style={{ padding: '3px 10px' }} disabled={fPage >= Math.ceil(ff.length / 10) - 1} onClick={() => setFPage(p => p + 1)}>
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
           </div>
 
@@ -780,53 +801,66 @@ export default function TVAPage() {
             {data.detail_depenses.length === 0
               ? <p className="dash-empty">Aucune sortie sur cette période.</p>
               : (
-                <div className="dash-table-wrap"><table className="dash-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th><th>Fournisseur</th>
-                      <th className="right">HT</th>
-                      <th className="center">Taux</th>
-                      <th className="right">TVA</th>
-                      <th className="right">TTC</th>
-                      <th className="center">📎</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fd.slice(0, 10).map(d => {
-                      const erreur = isTvaErronnee(d)
-                      return (
-                      <tr key={d.id} style={erreur ? { background: 'rgba(239,68,68,0.06)' } : undefined}>
-                        <td>{d.date}</td>
-                        <td>
-                          {d.fournisseur}
-                          {erreur && (
-                            <span title={getTvaAlertLabel(d)} style={{ marginLeft: 6, color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'default' }}>
-                              ⚠ {getTvaAlertLabel(d)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="right">{formatEur(d.montant_ht)}</td>
-                        <td className="center">
-                          <TauxCell row={d} onSave={handleCellSave} onSplitClick={() => setSplitTarget(d)} />
-                        </td>
-                        <td className="right">
-                          <EditableCell row={d} field="montant_tva" display={formatEur(d.montant_tva)} onSave={handleCellSave} />
-                        </td>
-                        <td className="right">
-                          <EditableCell row={d} field="montant_ttc" display={<strong>{formatEur(d.montant_ttc)}</strong>} onSave={handleCellSave} />
-                        </td>
-                        <td className="center" style={{ fontSize: 12, color: d.has_attachment ? '#16a34a' : 'var(--pencil)' }}>
-                          {d.bank_source ? (d.has_attachment ? '📎' : '—') : null}
-                        </td>
+                <>
+                  <div className="dash-table-wrap"><table className="dash-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th><th>Fournisseur</th>
+                        <th className="right">HT</th>
+                        <th className="center">Taux</th>
+                        <th className="right">TVA</th>
+                        <th className="right">TTC</th>
+                        <th className="center">📎</th>
                       </tr>
-                      )
-                    })}
-                  </tbody>
-                </table></div>
+                    </thead>
+                    <tbody>
+                      {fd.slice(dPage * 10, dPage * 10 + 10).map(d => {
+                        const erreur = isTvaErronnee(d)
+                        return (
+                        <tr key={d.id} style={erreur ? { background: 'rgba(239,68,68,0.06)' } : undefined}>
+                          <td>{d.date}</td>
+                          <td>
+                            {d.fournisseur}
+                            {erreur && (
+                              <span title={getTvaAlertLabel(d)} style={{ marginLeft: 6, color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'default' }}>
+                                ⚠ {getTvaAlertLabel(d)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="right">{formatEur(d.montant_ht)}</td>
+                          <td className="center">
+                            <TauxCell row={d} onSave={handleCellSave} onSplitClick={() => setSplitTarget(d)} />
+                          </td>
+                          <td className="right">
+                            <EditableCell row={d} field="montant_tva" display={formatEur(d.montant_tva)} onSave={handleCellSave} />
+                          </td>
+                          <td className="right">
+                            <EditableCell row={d} field="montant_ttc" display={<strong>{formatEur(d.montant_ttc)}</strong>} onSave={handleCellSave} />
+                          </td>
+                          <td className="center" style={{ fontSize: 12, color: d.has_attachment ? '#16a34a' : 'var(--pencil)' }}>
+                            {d.bank_source ? (d.has_attachment ? '📎' : '—') : null}
+                          </td>
+                        </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table></div>
+                  {fd.length > 10 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
+                      <button className="dash-btn-ghost" style={{ padding: '3px 10px' }} disabled={dPage === 0} onClick={() => setDPage(p => p - 1)}>
+                        <ChevronLeft size={14} />
+                      </button>
+                      <span style={{ fontSize: 12, color: 'var(--pencil)' }}>
+                        {dPage + 1} / {Math.ceil(fd.length / 10)}
+                      </span>
+                      <button className="dash-btn-ghost" style={{ padding: '3px 10px' }} disabled={dPage >= Math.ceil(fd.length / 10) - 1} onClick={() => setDPage(p => p + 1)}>
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
           </div>
-
-          <CA3Section data={data} debut={debut} fin={fin} />
         </>
       )}
 
