@@ -3,9 +3,10 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
-import { X, Check, ChevronLeft, ChevronRight, PenLine } from 'lucide-react'
+import { X, Check, ChevronLeft, ChevronRight, PenLine, AlertTriangle } from 'lucide-react'
 import type { Facture, Depense } from '@/lib/types/database'
 import { getCatEntreesGroups, getCatSortiesGroups, type CatGroup } from '@/lib/categories'
+import { isTvaErronnee, getTvaAlertLabel } from '@/lib/tva-validation'
 import { sendInvoiceEmail } from './actions'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -712,6 +713,11 @@ export default function TransactionsPage() {
     return [...entries, ...exits].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
   }, [factures, depenses])
 
+  const alertCount = useMemo(
+    () => allRows.filter(r => isTvaErronnee(r)).length,
+    [allRows]
+  )
+
   const baseRows = tab === 'tous' ? allRows
     : tab === 'entrees' ? factures.map(f => ({ ...f, _type: 'entree' as const, _key: `entree-${f.id}` }))
     : depenses.map(d => ({ ...d, _type: 'sortie' as const, _key: `sortie-${d.id}` }))
@@ -942,6 +948,11 @@ export default function TransactionsPage() {
           <InlineCell row={row} field="taux_tva" editType={row.taux_tva === -1 ? undefined : 'pills'} value={String(row.taux_tva)}
             display={tvaBadge} options={tvaOptions} onSave={handleCellSave}
             onSplitClick={() => setSplitTarget(row)} />
+          {isTvaErronnee(row) && (
+            <span className="dash-badge dash-badge-orange" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, marginTop: 2 }}>
+              <AlertTriangle size={10} />{getTvaAlertLabel(row)}
+            </span>
+          )}
         </td>
         <td className="right">
           <InlineCell row={row} field="montant_ttc" editType="number" value={String(row.montant_ttc)}
@@ -995,6 +1006,12 @@ export default function TransactionsPage() {
         <div>
           <h1 className="dash-title">Transactions</h1>
           <p className="dash-subtitle">{factures.length} entrée{factures.length !== 1 ? 's' : ''} · {depenses.length} sortie{depenses.length !== 1 ? 's' : ''}</p>
+          {alertCount > 0 && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 6, fontSize: 12, color: '#92400e' }}>
+              <AlertTriangle size={12} />
+              {alertCount} transaction{alertCount > 1 ? 's' : ''} avec TVA à vérifier
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button className="dash-btn-ghost" onClick={exportCsv} disabled={filtered.length === 0} title={`Exporter ${filtered.length} ligne(s) en CSV`}>

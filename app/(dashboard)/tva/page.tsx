@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Copy, Check, X } from 'lucide-react'
+import { Copy, Check, X, AlertTriangle, ChevronRight } from 'lucide-react'
 import type { Facture, Depense } from '@/lib/types/database'
 import { isTvaErronnee, getTvaAlertLabel } from '@/lib/tva-validation'
 
@@ -151,18 +151,39 @@ function CA3Section({ data }: { data: ReturnType<typeof computeTVA>; debut: stri
 
 // ── TauxTable (ventilation summary) ──────────────────────────────────────────
 
-function TauxTable({ par_taux }: { par_taux: Record<string, { base_ht: number; tva: number }> }) {
+function TauxTable({
+  par_taux,
+  onTauxClick,
+}: {
+  par_taux: Record<string, { base_ht: number; tva: number }>
+  onTauxClick?: (taux: string) => void
+}) {
+  const [hoveredTaux, setHoveredTaux] = useState<string | null>(null)
   const lines = Object.entries(par_taux).filter(([, v]) => v.base_ht !== 0 || v.tva !== 0)
   if (!lines.length) return <p className="dash-empty">Aucune opération.</p>
   return (
     <table className="dash-table" style={{ marginTop: 8 }}>
-      <thead><tr><th>Taux</th><th className="right">Base HT</th><th className="right">TVA</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Taux</th>
+          <th className="right">Base HT</th>
+          <th className="right">TVA</th>
+          {onTauxClick && <th style={{ width: 24 }} />}
+        </tr>
+      </thead>
       <tbody>
         {lines.map(([t, v]) => (
-          <tr key={t}>
+          <tr
+            key={t}
+            onClick={onTauxClick ? () => onTauxClick(t) : undefined}
+            style={{ cursor: onTauxClick ? 'pointer' : undefined, background: onTauxClick && hoveredTaux === t ? 'var(--offwhite)' : '' }}
+            onMouseEnter={onTauxClick ? () => setHoveredTaux(t) : undefined}
+            onMouseLeave={onTauxClick ? () => setHoveredTaux(null) : undefined}
+          >
             <td>{TAUX_LABELS[t] ?? (t === 'multi' ? 'Multi-taux' : `${t} %`)}</td>
             <td className="right">{formatEur(v.base_ht)}</td>
             <td className="right"><strong>{formatEur(v.tva)}</strong></td>
+            {onTauxClick && <td style={{ textAlign: 'center', color: 'var(--pencil)' }}><ChevronRight size={12} /></td>}
           </tr>
         ))}
       </tbody>
@@ -389,6 +410,97 @@ function EditableCell({ row, field, display, onSave }: {
   )
 }
 
+// ── TvaDeductibleModal ────────────────────────────────────────────────────────
+
+function TvaDeductibleModal({
+  taux,
+  allRows,
+  onSave,
+  onClose,
+}: {
+  taux: string
+  allRows: (Depense & { _kind: 'sortie' })[]
+  onSave: (row: TvaRow, field: string, value: string) => Promise<void>
+  onClose: () => void
+}) {
+  const filtered = allRows.filter(r => String(r.taux_tva) === taux)
+  const [pendingTaux, setPendingTaux] = useState<Record<string, string>>(() =>
+    Object.fromEntries(filtered.map(r => [r.id, taux]))
+  )
+  const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [saved, setSaved] = useState<Record<string, boolean>>({})
+
+  async function handleCorrect(row: Depense & { _kind: 'sortie' }) {
+    const newTaux = pendingTaux[row.id]
+    if (!newTaux || newTaux === String(row.taux_tva)) return
+    setSaving(s => ({ ...s, [row.id]: true }))
+    try {
+      await onSave(row, 'taux_tva', newTaux)
+      setPendingTaux(p => ({ ...p, [row.id]: newTaux }))
+      setSaved(s => ({ ...s, [row.id]: true }))
+      setTimeout(() => setSaved(s => ({ ...s, [row.id]: false })), 2000)
+    } finally {
+      setSaving(s => ({ ...s, [row.id]: false }))
+    }
+  }
+
+  return (
+    <div className="dash-modal-backdrop" onClick={onClose}>
+      <div className="dash-modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+        <div className="dash-modal-header">
+          <h2 className="dash-modal-title">Dépenses au taux {taux} %</h2>
+          <button className="dash-modal-close" aria-label="Fermer" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="dash-modal-body">
+          {filtered.length === 0
+            ? <p className="dash-empty">Aucune dépense à ce taux sur cette période.</p>
+            : filtered.map(row => {
+                const erreur = isTvaErronnee(row)
+                return (
+                  <div key={row.id} style={{
+                    display: 'grid', gridTemplateColumns: '90px 1fr auto auto auto',
+                    gap: 10, alignItems: 'center', padding: '10px 0',
+                    borderBottom: '1px solid var(--border)'
+                  }}>
+                    <span style={{ fontSize: 12, color: 'var(--pencil)' }}>{row.date}</span>
+                    <div>
+                      <span style={{ fontSize: 13 }}>{row.fournisseur}</span>
+                      {erreur && (
+                        <span className="dash-badge dash-badge-orange" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, marginLeft: 8 }}>
+                          <AlertTriangle size={10} />{getTvaAlertLabel(row)}
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 13, fontFamily: 'Courier Prime, monospace', whiteSpace: 'nowrap' }}>{formatEur(row.montant_ttc)}</span>
+                    <select
+                      className="dash-field-select"
+                      style={{ padding: '4px 8px', fontSize: 12, width: 90 }}
+                      value={pendingTaux[row.id] ?? taux}
+                      onChange={e => setPendingTaux(p => ({ ...p, [row.id]: e.target.value }))}
+                    >
+                      {TVA_RATES.map(r => <option key={r} value={r}>{r} %</option>)}
+                    </select>
+                    <button
+                      className="dash-btn"
+                      style={{ padding: '4px 10px', fontSize: 12 }}
+                      disabled={saving[row.id] || pendingTaux[row.id] === String(row.taux_tva)}
+                      onClick={() => handleCorrect(row)}
+                    >
+                      {saving[row.id] ? '…' : saved[row.id] ? <Check size={13} /> : 'Corriger'}
+                    </button>
+                  </div>
+                )
+              })
+          }
+        </div>
+        <div className="dash-modal-footer">
+          <button className="dash-btn-ghost" onClick={onClose}>Fermer</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function TVAPage() {
@@ -404,6 +516,7 @@ export default function TVAPage() {
   const [fTaux, setFTaux]       = useState('')
   const [dTaux, setDTaux]       = useState('')
   const [splitTarget, setSplitTarget] = useState<TvaRow | null>(null)
+  const [deductibleModal, setDeductibleModal] = useState<string | null>(null)
 
   // Restore period from localStorage after hydration
   useEffect(() => {
@@ -579,7 +692,10 @@ export default function TVAPage() {
             </div>
             <div className="dash-ventilation-card">
               <div className="dash-section-title">TVA Déductible — Ventilation <span className="dash-section-note">Ligne 20 CA3</span></div>
-              <TauxTable par_taux={data.deductible.par_taux} />
+              <TauxTable
+                par_taux={data.deductible.par_taux}
+                onTauxClick={(taux) => setDeductibleModal(taux)}
+              />
               {Object.keys(data.deductible.par_taux).length > 0 && (
                 <div className="dash-ventilation-total">
                   Base HT : <strong>{formatEur(data.deductible.total_base_ht)}</strong> · TVA : <strong>{formatEur(data.deductible.total_tva)}</strong>
@@ -716,6 +832,15 @@ export default function TVAPage() {
 
       {splitTarget && (
         <TvaSplitPanel row={splitTarget} onSave={handleSplitSave} onClose={() => setSplitTarget(null)} />
+      )}
+
+      {deductibleModal !== null && (
+        <TvaDeductibleModal
+          taux={deductibleModal}
+          allRows={data.detail_depenses.map(d => ({ ...d, _kind: 'sortie' as const }))}
+          onSave={handleCellSave}
+          onClose={() => setDeductibleModal(null)}
+        />
       )}
     </div>
   )
