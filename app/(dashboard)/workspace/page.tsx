@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Settings, Users, User, AlertTriangle, Copy, Check, X,
   RefreshCw, Send, ChevronDown,
@@ -77,6 +78,7 @@ function inviteStatus(inv: InvitationRow): { label: string; cls: string } {
 // ─── Root page ────────────────────────────────────────────────────────────────
 
 export default function WorkspacePage() {
+  const router = useRouter()
   const [ws, setWs]                   = useState<WorkspaceData | null>(null)
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState<string | null>(null)
@@ -121,89 +123,66 @@ export default function WorkspacePage() {
 
   useEffect(() => { load() }, [load])
 
-  if (loading) return <div className="dash-loading">Chargement…</div>
-  if (error || !ws) return <div className="dash-error">{error ?? 'Erreur inconnue'}</div>
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') router.back() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [router])
 
-  const isOwner = userRole === 'owner'
+  const isOwner = !!(ws && userRole === 'owner')
 
   return (
-    <div className="dash-page">
-      <div className="dash-header">
-        <div>
-          <h1 className="dash-title">Paramètres</h1>
-          <p className="dash-subtitle">Gérez votre workspace, votre équipe et votre compte</p>
-        </div>
-      </div>
+    <div className="settings-modal-backdrop" onClick={() => router.back()}>
+      <div className="settings-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Paramètres">
+        {loading && (
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--pencil)', fontFamily: 'Courier Prime, monospace', fontSize: 13 }}>
+            Chargement…
+          </div>
+        )}
+        {!loading && (error || !ws) && (
+          <div style={{ padding: 32 }}><div className="dash-error">{error ?? 'Erreur inconnue'}</div></div>
+        )}
+        {!loading && ws && (
+          <div className="settings-layout">
+            <nav className="settings-nav" aria-label="Sections des paramètres">
+              <div className="settings-nav-header">
+                <span>{ws.name}</span>
+                <button onClick={() => router.back()} aria-label="Fermer les paramètres" title="Fermer (Échap)">
+                  <X size={15} />
+                </button>
+              </div>
 
-      <div className="settings-layout">
-        {/* Left nav */}
-        <nav className="settings-nav" aria-label="Sections des paramètres">
-          <span className="settings-nav-group">Workspace</span>
-
-          <button
-            className={`settings-nav-item${activeSection === 'workspace' ? ' settings-nav-item-active' : ''}`}
-            onClick={() => setActiveSection('workspace')}
-            aria-current={activeSection === 'workspace' ? 'page' : undefined}
-          >
-            <Settings size={15} aria-hidden="true" />
-            Général
-          </button>
-
-          <button
-            className={`settings-nav-item${activeSection === 'equipe' ? ' settings-nav-item-active' : ''}`}
-            onClick={() => setActiveSection('equipe')}
-            aria-current={activeSection === 'equipe' ? 'page' : undefined}
-          >
-            <Users size={15} aria-hidden="true" />
-            Équipe ({ws.members.length})
-          </button>
-
-          <span className="settings-nav-group">Mon compte</span>
-
-          <button
-            className={`settings-nav-item${activeSection === 'compte' ? ' settings-nav-item-active' : ''}`}
-            onClick={() => setActiveSection('compte')}
-            aria-current={activeSection === 'compte' ? 'page' : undefined}
-          >
-            <User size={15} aria-hidden="true" />
-            Mon compte
-          </button>
-
-          {isOwner && (
-            <>
-              <span className="settings-nav-group">Avancé</span>
-              <button
-                className={`settings-nav-item settings-nav-item-danger${activeSection === 'danger' ? ' settings-nav-item-active' : ''}`}
-                onClick={() => setActiveSection('danger')}
-                aria-current={activeSection === 'danger' ? 'page' : undefined}
-              >
-                <AlertTriangle size={15} aria-hidden="true" />
-                Zone de danger
+              <span className="settings-nav-group">Workspace</span>
+              <button className={`settings-nav-item${activeSection === 'workspace' ? ' settings-nav-item-active' : ''}`} onClick={() => setActiveSection('workspace')} aria-current={activeSection === 'workspace' ? 'page' : undefined}>
+                <Settings size={15} aria-hidden="true" /> Général
               </button>
-            </>
-          )}
-        </nav>
+              <button className={`settings-nav-item${activeSection === 'equipe' ? ' settings-nav-item-active' : ''}`} onClick={() => setActiveSection('equipe')} aria-current={activeSection === 'equipe' ? 'page' : undefined}>
+                <Users size={15} aria-hidden="true" /> Équipe ({ws.members.length})
+              </button>
 
-        {/* Right content panel */}
-        <div className="settings-content">
-          {activeSection === 'workspace' && (
-            <WorkspaceSection ws={ws} onSaved={load} />
-          )}
-          {activeSection === 'equipe' && (
-            <EquipeSection
-              ws={ws}
-              currentUserId={userId}
-              currentUserRole={userRole}
-              onChanged={load}
-            />
-          )}
-          {activeSection === 'compte' && (
-            <CompteSection userEmail={userEmail} userName={userName} />
-          )}
-          {activeSection === 'danger' && isOwner && (
-            <DangerSection workspaceId={ws.id} />
-          )}
-        </div>
+              <span className="settings-nav-group">Mon compte</span>
+              <button className={`settings-nav-item${activeSection === 'compte' ? ' settings-nav-item-active' : ''}`} onClick={() => setActiveSection('compte')} aria-current={activeSection === 'compte' ? 'page' : undefined}>
+                <User size={15} aria-hidden="true" /> Mon compte
+              </button>
+
+              {isOwner && (
+                <>
+                  <span className="settings-nav-group">Avancé</span>
+                  <button className={`settings-nav-item settings-nav-item-danger${activeSection === 'danger' ? ' settings-nav-item-active' : ''}`} onClick={() => setActiveSection('danger')} aria-current={activeSection === 'danger' ? 'page' : undefined}>
+                    <AlertTriangle size={15} aria-hidden="true" /> Zone de danger
+                  </button>
+                </>
+              )}
+            </nav>
+
+            <div className="settings-content">
+              {activeSection === 'workspace' && <WorkspaceSection ws={ws} onSaved={load} />}
+              {activeSection === 'equipe' && <EquipeSection ws={ws} currentUserId={userId} currentUserRole={userRole} onChanged={load} />}
+              {activeSection === 'compte' && <CompteSection userEmail={userEmail} userName={userName} />}
+              {activeSection === 'danger' && isOwner && <DangerSection workspaceId={ws.id} />}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
