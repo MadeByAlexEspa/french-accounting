@@ -1650,11 +1650,11 @@ body {
 }
 
 /* ── Feedback Panel ─────────────────────────────────────────────────────────── */
-.fp-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.25); z-index: 200; }
 .fp-panel {
   position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 100vw;
   background: var(--paper); border-left: 1px solid var(--rule);
   display: flex; flex-direction: column; z-index: 201;
+  pointer-events: auto;
 }
 .fp-header {
   display: flex; align-items: center; justify-content: space-between;

@@ -87,11 +87,8 @@ export default function FeedbackPanel() {
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fp-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
-
       {/* Drawer */}
-      <aside className="fp-panel" role="dialog" aria-label="Feedback" aria-modal="true">
+      <aside className="fp-panel" role="dialog" aria-label="Feedback">
         <div className="fp-header">
           <span className="fp-title">💬 Feedback</span>
           <button className="fp-close" onClick={() => setOpen(false)} aria-label="Fermer">✕</button>
