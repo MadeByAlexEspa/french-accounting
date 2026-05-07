@@ -9,7 +9,18 @@ CREATE TABLE IF NOT EXISTS exercice_annotations (
 
 ALTER TABLE exercice_annotations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "exercice_annotations_workspace" ON exercice_annotations
-  FOR ALL TO authenticated
-  USING  (workspace_id = ANY(auth_workspace_ids()))
-  WITH CHECK (workspace_id = ANY(auth_workspace_ids()));
+CREATE POLICY "exercice_annotations_select" ON exercice_annotations
+  FOR SELECT TO authenticated
+  USING (workspace_id IN (SELECT auth_workspace_ids()));
+
+CREATE POLICY "exercice_annotations_insert" ON exercice_annotations
+  FOR INSERT TO authenticated
+  WITH CHECK (workspace_id IN (SELECT auth_workspace_ids()));
+
+CREATE POLICY "exercice_annotations_update" ON exercice_annotations
+  FOR UPDATE TO authenticated
+  USING (workspace_id IN (SELECT auth_workspace_ids()));
+
+CREATE POLICY "exercice_annotations_delete" ON exercice_annotations
+  FOR DELETE TO authenticated
+  USING (workspace_id IN (SELECT auth_workspace_ids()));
