@@ -192,6 +192,8 @@ export interface Database {
           bank_source: string | null
           has_attachment: boolean
           created_at: string
+          push_status: 'sent' | 'rejected' | null
+          push_target: 'qonto' | 'shine' | null
         }
         Insert: {
           id?: number
@@ -209,6 +211,8 @@ export interface Database {
           bank_source?: string | null
           has_attachment?: boolean
           created_at?: string
+          push_status?: 'sent' | 'rejected' | null
+          push_target?: 'qonto' | 'shine' | null
         }
         Update: {
           id?: number
@@ -226,6 +230,8 @@ export interface Database {
           bank_source?: string | null
           has_attachment?: boolean
           created_at?: string
+          push_status?: 'sent' | 'rejected' | null
+          push_target?: 'qonto' | 'shine' | null
         }
         Relationships: []
       }

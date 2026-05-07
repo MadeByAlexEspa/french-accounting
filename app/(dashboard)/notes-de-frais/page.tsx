@@ -110,6 +110,12 @@ export default function NotesDefraisPage() {
     setConfirmDeleteId(null); setDeleting(false); await load()
   }
 
+  async function handlePushUpdate(id: number, status: 'sent' | 'rejected' | null, target: 'qonto' | 'shine' | null) {
+    const supabase = createClient()
+    await supabase.from('depenses').update({ push_status: status, push_target: target }).eq('id', id)
+    setDepenses(prev => prev.map(d => d.id === id ? { ...d, push_status: status, push_target: target } : d))
+  }
+
   // Category breakdown for footer
   const catTotals = depenses.reduce<Record<string, number>>((acc, d) => {
     acc[d.categorie] = round2((acc[d.categorie] ?? 0) + d.montant_ttc)
@@ -201,17 +207,18 @@ export default function NotesDefraisPage() {
             <thead>
               <tr>
                 <th>Date</th><th>Fournisseur</th><th>Description</th><th>Catégorie</th>
-                <th>TVA</th><th>Statut</th><th>PJ</th><th className="right">TTC</th><th></th>
+                <th>TVA</th><th>Statut</th><th className="center">PJ</th><th className="center">Banque</th>
+                <th className="right">TTC</th><th></th>
               </tr>
             </thead>
             <tbody>
               {Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 8 }).map((_, j) => (
+                  {Array.from({ length: 9 }).map((_, j) => (
                     <td key={j}>
                       <span
                         className="dash-skeleton-line"
-                        style={{ height: 14, width: j === 0 ? 80 : j === 2 ? 160 : j === 7 ? 70 : 100, display: 'block' }}
+                        style={{ height: 14, width: j === 0 ? 80 : j === 2 ? 160 : j === 8 ? 70 : 100, display: 'block' }}
                       />
                     </td>
                   ))}
@@ -240,7 +247,7 @@ export default function NotesDefraisPage() {
             <thead>
               <tr>
                 <th>Date</th><th>Fournisseur</th><th>Description</th><th>Catégorie</th>
-                <th className="center">TVA</th><th>Statut</th><th className="center">PJ</th>
+                <th className="center">TVA</th><th>Statut</th><th className="center">PJ</th><th className="center">Banque</th>
                 <th className="right">TTC</th><th></th>
               </tr>
             </thead>
@@ -259,6 +266,52 @@ export default function NotesDefraisPage() {
                   </td>
                   <td className="center" style={{ color: d.has_attachment ? '#16a34a' : 'var(--pencil)', fontSize: 14 }}>
                     {d.has_attachment ? '📎' : '—'}
+                  </td>
+                  <td className="center">
+                    {(() => {
+                      if (d.push_status === 'sent') {
+                        return (
+                          <span
+                            className="dash-badge dash-badge-green"
+                            style={{ cursor: 'pointer', fontSize: 10 }}
+                            title="Cliquer pour changer le statut"
+                            onClick={() => handlePushUpdate(d.id, null, null)}
+                          >
+                            ✓ {d.push_target === 'qonto' ? 'Qonto' : 'Shine'}
+                          </span>
+                        )
+                      }
+                      if (d.push_status === 'rejected') {
+                        return (
+                          <span
+                            className="dash-badge dash-badge-red"
+                            style={{ cursor: 'pointer', fontSize: 10 }}
+                            title="Cliquer pour réinitialiser"
+                            onClick={() => handlePushUpdate(d.id, null, null)}
+                          >
+                            ✗ Rejeté
+                          </span>
+                        )
+                      }
+                      return (
+                        <select
+                          className="dash-filter-select"
+                          style={{ fontSize: 10, padding: '2px 4px', minWidth: 90 }}
+                          value=""
+                          onChange={e => {
+                            const val = e.target.value
+                            if (val === 'qonto') handlePushUpdate(d.id, 'sent', 'qonto')
+                            else if (val === 'shine') handlePushUpdate(d.id, 'sent', 'shine')
+                            else if (val === 'rejected') handlePushUpdate(d.id, 'rejected', null)
+                          }}
+                        >
+                          <option value="">— À transmettre</option>
+                          <option value="qonto">✓ Envoyé Qonto</option>
+                          <option value="shine">✓ Envoyé Shine</option>
+                          <option value="rejected">✗ Rejeté</option>
+                        </select>
+                      )
+                    })()}
                   </td>
                   <td className="right" style={{ fontFamily: 'Courier Prime,monospace', fontWeight: 700 }}>{formatEur(d.montant_ttc)}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
@@ -296,13 +349,13 @@ export default function NotesDefraisPage() {
             <tfoot>
               {Object.entries(catTotals).sort((a, b) => b[1] - a[1]).map(([cat, total]) => (
                 <tr key={cat} style={{ fontSize: 12, color: 'var(--pencil)' }}>
-                  <td colSpan={7} style={{ fontFamily: 'Courier Prime,monospace', paddingTop: 4 }}>{cat}</td>
+                  <td colSpan={8} style={{ fontFamily: 'Courier Prime,monospace', paddingTop: 4 }}>{cat}</td>
                   <td className="right" style={{ fontFamily: 'Courier Prime,monospace', paddingTop: 4 }}>{formatEur(total)}</td>
                   <td />
                 </tr>
               ))}
               <tr style={{ borderTop: '2px solid var(--ink)' }}>
-                <td colSpan={7}><strong>Total général</strong></td>
+                <td colSpan={8}><strong>Total général</strong></td>
                 <td className="right"><strong style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(grandTotal)}</strong></td>
                 <td />
               </tr>
