@@ -476,6 +476,7 @@ function EquipeSection({
   const [removeError, setRemoveError]     = useState<string | null>(null)
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null)
   const [cancelling, setCancelling]       = useState(false)
+  const [teamTab, setTeamTab]             = useState<'membres' | 'invitations'>('membres')
 
   const loadInvitations = useCallback(async () => {
     const res = await listInvitations()
@@ -580,21 +581,17 @@ function EquipeSection({
   return (
     <div>
       <div className="settings-section-header">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h2 className="settings-section-title">Équipe</h2>
-            <p className="settings-section-desc">{members.length} membre{members.length !== 1 ? 's' : ''}</p>
-          </div>
-          {currentUserRole !== 'member' && (
-            <button
-              className="dash-btn"
-              onClick={() => { setShowInviteModal(true); setGeneratedUrl(null); setInviteError(null) }}
-            >
-              <Send size={14} aria-hidden="true" />
-              Inviter
-            </button>
-          )}
-        </div>
+        <h2 className="settings-section-title">Équipe</h2>
+        <p className="settings-section-desc">{members.length} membre{members.length !== 1 ? 's' : ''}</p>
+      </div>
+
+      <div className="dash-tabs" style={{ marginBottom: 20 }}>
+        <button className={`dash-tab ${teamTab === 'membres' ? 'dash-tab-active' : ''}`} onClick={() => setTeamTab('membres')}>
+          Membres <span style={{ marginLeft: 4, fontFamily: 'Courier Prime,monospace', fontSize: 11, opacity: 0.7 }}>{members.length}</span>
+        </button>
+        <button className={`dash-tab ${teamTab === 'invitations' ? 'dash-tab-active' : ''}`} onClick={() => setTeamTab('invitations')}>
+          Invitations <span style={{ marginLeft: 4, fontFamily: 'Courier Prime,monospace', fontSize: 11, opacity: 0.7 }}>{pendingInvitations.length}</span>
+        </button>
       </div>
 
       {/* Invite modal */}
@@ -744,12 +741,12 @@ function EquipeSection({
         </div>
       )}
 
-      {/* Role error banner */}
+      {/* ── Membres tab ─────────────────────────────────────────────── */}
+      {teamTab === 'membres' && (
+      <div>
       {roleError && (
         <div className="dash-error" role="alert" style={{ marginBottom: 12 }}>{roleError}</div>
       )}
-
-      {/* Members list */}
       <div style={{ marginBottom: 32 }}>
         {members.map(member => {
           const isSelf = member.user_id === currentUserId
@@ -807,11 +804,28 @@ function EquipeSection({
         })}
       </div>
 
-      {/* Pending invitations */}
-      {pendingInvitations.length > 0 && (
-        <div>
-          <div className="settings-sub-title">Invitations en cours</div>
+      </div>
+      )}
 
+      {/* ── Invitations tab ─────────────────────────────────────────── */}
+      {teamTab === 'invitations' && (
+      <div>
+        {currentUserRole !== 'member' && (
+          <div style={{ marginBottom: 20 }}>
+            <button
+              className="dash-btn"
+              onClick={() => { setShowInviteModal(true); setGeneratedUrl(null); setInviteError(null) }}
+            >
+              <Send size={14} aria-hidden="true" />
+              Inviter un membre
+            </button>
+          </div>
+        )}
+
+        {pendingInvitations.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace' }}>Aucune invitation en cours.</p>
+        ) : (
+        <div>
           {resendError   && <div className="dash-error" role="alert" style={{ marginBottom: 12 }}>{resendError}</div>}
           {resendSuccess && (
             <div className="dash-success-msg" role="status" style={{ marginBottom: 12 }}>
@@ -832,7 +846,6 @@ function EquipeSection({
               )}
             </div>
           )}
-
           {pendingInvitations.map(inv => {
             const st = inviteStatus(inv)
             const isPending = !inv.used_at && new Date(inv.expires_at) >= new Date()
@@ -895,6 +908,8 @@ function EquipeSection({
             )
           })}
         </div>
+        )}
+      </div>
       )}
 
       {/* Remove member confirmation modal */}
