@@ -59,7 +59,7 @@ export default function AcceptForm({ token, email }: { token: string; email: str
       </div>
       {error && <div className="auth-error" role="alert">{error}</div>}
       <button type="submit" className="auth-btn" disabled={loading}>
-        {loading ? 'Création du compte…' : 'Créer mon compte →'}
+        {loading ? 'Création du compte…' : 'Créer mon compte'}
       </button>
     </form>
   )

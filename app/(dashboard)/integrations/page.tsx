@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Check } from 'lucide-react'
 import {
   getQontoAccounts,
   saveQontoAccount,
@@ -103,7 +104,7 @@ function ReconciliationSection() {
 
         {pending.length === 0 ? (
           <div className="dash-empty-state" style={{ border: 'none', padding: '32px 0' }}>
-            <span className="dash-empty-state-glyph">✓</span>
+            <span className="dash-empty-state-glyph"><Check size={20} /></span>
             <p className="dash-empty-state-title">Tout est rapproché</p>
             <p className="dash-empty-state-desc">Aucune facture manuelle en attente de paiement.</p>
           </div>
@@ -133,8 +134,8 @@ function ReconciliationSection() {
                       </td>
                       <td>
                         {match ? (
-                          <span style={{ fontSize: 12, color: '#16a34a', fontFamily: 'Courier Prime,monospace' }}>
-                            ✓ {match.bank_source} · {match.date} · {formatEur(match.montant_ttc)}
+                          <span style={{ fontSize: 12, color: '#16a34a', fontFamily: 'Courier Prime,monospace', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                            <Check size={12} style={{ verticalAlign: 'middle', marginRight: 2 }} /> {match.bank_source} · {match.date} · {formatEur(match.montant_ttc)}
                           </span>
                         ) : (
                           <span style={{ fontSize: 12, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace' }}>

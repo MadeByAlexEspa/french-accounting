@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { CheckCircle, AlertTriangle, ChevronRight } from 'lucide-react'
 import type { Facture, Depense } from '@/lib/types/database'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -310,7 +311,9 @@ function BilanTab({ debut, fin, bilan }: { debut: string; fin: string; bilan: Bi
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: equilibre ? '#15803d' : '#dc2626' }}>
-            {equilibre ? '✓ Bilan équilibré — Actif = Passif' : `⚠️ Écart de ${formatEur(Math.abs(ecart))}`}
+            {equilibre
+              ? <><CheckCircle size={14} style={{ color: '#16a34a', verticalAlign: 'middle', marginRight: 4 }} /> Bilan équilibré — Actif = Passif</>
+              : <><AlertTriangle size={14} style={{ color: '#dc2626', verticalAlign: 'middle', marginRight: 4 }} /> Écart de {formatEur(Math.abs(ecart))}</>}
           </div>
           <div style={{ display: 'flex', gap: 24, fontSize: 13 }}>
             <span>Total Actif : <strong>{formatEur(totalActif)}</strong></span>
@@ -327,7 +330,7 @@ function BilanTab({ debut, fin, bilan }: { debut: string; fin: string; bilan: Bi
       </div>
 
       <p style={{ marginTop: 12, fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)', lineHeight: 1.7 }}>
-        Calculé depuis vos transactions · Période {debut} → {fin} pour le résultat et le fonds de roulement · Cumulatif depuis l'origine pour le bilan patrimonial.
+        Calculé depuis vos transactions · Période {debut} – {fin} pour le résultat et le fonds de roulement · Cumulatif depuis l'origine pour le bilan patrimonial.
         TVA collectée {formatEur(bilan.tva_collectee)} · TVA déductible {formatEur(bilan.tva_deductible)}.
         Pour équilibrer le bilan, catégorisez apports en capital (101), emprunts (164), immobilisations (2051, 2052, 213…).
       </p>
@@ -417,7 +420,7 @@ export default function ExercicePage() {
         </button>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input type="date" className="dash-filter-input" value={debut} onChange={e => handleDebut(e.target.value)} />
-          <span style={{ color: 'var(--pencil)', fontSize: 13 }}>→</span>
+          <ChevronRight size={13} style={{ color: 'var(--pencil)' }} />
           <input type="date" className="dash-filter-input" value={fin}   onChange={e => handleFin(e.target.value)} />
         </div>
       </div>
@@ -440,12 +443,12 @@ export default function ExercicePage() {
             <div className="dash-kpi-card">
               <p className="dash-kpi-label">Produits HT</p>
               <p className="dash-kpi-value">{formatEur(pnl.total_produits)}</p>
-              <p className="dash-kpi-sub">{debut} → {fin}</p>
+              <p className="dash-kpi-sub">{debut} – {fin}</p>
             </div>
             <div className="dash-kpi-card">
               <p className="dash-kpi-label">Charges HT</p>
               <p className="dash-kpi-value">{formatEur(pnl.total_charges)}</p>
-              <p className="dash-kpi-sub">{debut} → {fin}</p>
+              <p className="dash-kpi-sub">{debut} – {fin}</p>
             </div>
             {pnl.resultat >= 0
               ? <div className="dash-kpi-card dash-kpi-card-credit">

@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
+import { X, Check, ChevronLeft, ChevronRight, PenLine } from 'lucide-react'
 import type { Facture, Depense } from '@/lib/types/database'
 import { getCatEntreesGroups, getCatSortiesGroups, type CatGroup } from '@/lib/categories'
 import { sendInvoiceEmail } from './actions'
@@ -117,7 +118,7 @@ function TvaSplitPanel({ row, onSave, onClose }: {
             Total TTC : <strong>{formatEur(totalTtc)}</strong>
             {Math.abs(diff) >= 0.02
               ? <span style={{ marginLeft: 16, color: '#dc2626' }}>Écart {diff > 0 ? '+' : ''}{formatEur(diff)} — ajustez les HT</span>
-              : totalTtc > 0 && <span style={{ marginLeft: 16, color: '#16a34a' }}>✓ Correspond au TTC</span>}
+              : totalTtc > 0 && <span style={{ marginLeft: 16, color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={13} /> Correspond au TTC</span>}
           </div>
           {error && <div className="dash-error" style={{ marginTop: 12 }}>{error}</div>}
         </div>
@@ -512,7 +513,7 @@ function InlineCell({ row, field, display, editType, value, options, groups, onS
               {o.label}
             </button>
           ))}
-          <button type="button" style={{ padding: '2px 4px', fontSize: 11, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--pencil)' }} onClick={cancel}>✕</button>
+          <button type="button" style={{ padding: '2px 4px', fontSize: 11, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--pencil)', display: 'inline-flex', alignItems: 'center' }} onClick={cancel}><X size={14} /></button>
         </div>
       )
     }
@@ -553,8 +554,8 @@ function InlineCell({ row, field, display, editType, value, options, groups, onS
             onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onSplitClick() }}
             style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 2, cursor: 'pointer', fontSize: 10, padding: '1px 4px', color: 'var(--pencil)', lineHeight: 1 }}>⊞</button>
         )}
-        {saveStatus && <span style={{ fontSize: 10, color: statusColor }}>
-          {saveStatus === 'saving' ? '···' : saveStatus === 'saved' ? '✓' : '✕'}
+        {saveStatus && <span style={{ fontSize: 10, color: statusColor, display: 'inline-flex', alignItems: 'center' }}>
+          {saveStatus === 'saving' ? '···' : saveStatus === 'saved' ? <Check size={13} /> : <X size={13} />}
         </span>}
       </span>
     )
@@ -567,8 +568,8 @@ function InlineCell({ row, field, display, editType, value, options, groups, onS
       style={{ cursor: editType ? 'pointer' : 'default', display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 20 }}
     >
       <span>{display}</span>
-      {saveStatus && <span style={{ fontSize: 10, color: statusColor }}>
-        {saveStatus === 'saving' ? '···' : saveStatus === 'saved' ? '✓' : '✕'}
+      {saveStatus && <span style={{ fontSize: 10, color: statusColor, display: 'inline-flex', alignItems: 'center' }}>
+        {saveStatus === 'saving' ? '···' : saveStatus === 'saved' ? <Check size={13} /> : <X size={13} />}
       </span>}
     </span>
   )
@@ -1053,10 +1054,10 @@ export default function TransactionsPage() {
         {(filterDateFrom || filterDateTo) && (
           <button
             className="dash-btn-ghost"
-            style={{ fontSize: 12, padding: '4px 10px', color: 'var(--pencil)' }}
+            style={{ fontSize: 12, padding: '4px 10px', color: 'var(--pencil)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
             onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setPage(1) }}
           >
-            ✕ Effacer dates
+            <X size={12} /> Effacer dates
           </button>
         )}
       </div>
@@ -1064,7 +1065,7 @@ export default function TransactionsPage() {
       <div className="dash-filter-bar">
         <input className="dash-filter-input" type="text" placeholder="Rechercher un tiers…" value={filterTiers} onChange={e => setFilterTiers(e.target.value)} />
         <input className="dash-filter-input" type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} title="Date début" />
-        <span style={{ color: 'var(--pencil)', fontSize: 13, padding: '0 2px' }}>→</span>
+        <ChevronRight size={14} style={{ color: 'var(--pencil)', flexShrink: 0 }} />
         <input className="dash-filter-input" type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} title="Date fin" />
         <select className="dash-filter-select" value={filterCategorie} onChange={e => setFilterCategorie(e.target.value)}>
           <option value="">Toutes catégories</option>
@@ -1119,7 +1120,7 @@ export default function TransactionsPage() {
 
           {pageRows.length === 0 && !hasFilters ? (
             <div className="dash-empty-state">
-              <div className="dash-empty-state-glyph">✎</div>
+              <div className="dash-empty-state-glyph"><PenLine size={32} /></div>
               <p className="dash-empty-state-title">
                 {tab === 'entrees' ? "Aucune entrée pour l’instant"
                   : tab === 'sorties' ? "Aucune sortie pour l’instant"
@@ -1267,7 +1268,7 @@ export default function TransactionsPage() {
           <div className="dash-modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
             <div className="dash-modal-header">
               <h3 className="dash-modal-title">Envoyer la facture</h3>
-              <button className="dash-modal-close" onClick={() => setEmailTarget(null)}>✕</button>
+              <button className="dash-modal-close" onClick={() => setEmailTarget(null)}><X size={14} /></button>
             </div>
             <div style={{ padding: '16px 20px' }}>
               <p style={{ fontSize: 13, color: 'var(--pencil)', marginBottom: 16 }}>

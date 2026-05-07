@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { Settings } from 'lucide-react'
 
 type Item = {
   id: string
@@ -9,7 +10,7 @@ type Item = {
   sub?: string
   href?: string
   action?: () => void
-  glyph: string
+  glyph: React.ReactNode
 }
 
 const NAV_ITEMS: Item[] = [
@@ -19,7 +20,7 @@ const NAV_ITEMS: Item[] = [
   { id: 'exercice',     label: 'Comptes annuels',   sub: 'Bilan, résultat',      href: '/exercice',                 glyph: '§' },
   { id: 'notes-frais',  label: 'Notes de frais',    sub: 'Remboursements',       href: '/notes-de-frais',           glyph: '✉' },
   { id: 'integrations', label: 'Connexions API',    sub: 'Qonto, Shine…',        href: '/integrations',             glyph: '⟳' },
-  { id: 'workspace',    label: 'Paramètres',        sub: 'Workspace, équipe',    href: '/workspace',                glyph: '⚙' },
+  { id: 'workspace',    label: 'Paramètres',        sub: 'Workspace, équipe',    href: '/workspace',                glyph: <Settings size={14} /> },
   { id: 'new-entry',    label: 'Nouvelle entrée',   sub: 'Raccourci: N',         href: '/transactions?tab=entrees', glyph: '+' },
 ]
 

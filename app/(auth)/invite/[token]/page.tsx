@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import AcceptForm from './AcceptForm'
+import { ChevronLeft } from 'lucide-react'
 
 interface Props {
   params: Promise<{ token: string }>
@@ -53,7 +54,7 @@ export default async function InvitePage({ params }: Props) {
                 </p>
               </div>
               <p className="auth-footer">
-                <Link href="/login" className="auth-link">← Retour à la connexion</Link>
+                <Link href="/login" className="auth-link"><ChevronLeft size={14} style={{ verticalAlign: 'middle' }} /> Retour à la connexion</Link>
               </p>
             </>
           ) : (

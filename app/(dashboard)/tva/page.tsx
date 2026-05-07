@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Copy, Check, X } from 'lucide-react'
 import type { Facture, Depense } from '@/lib/types/database'
 import { isTvaErronnee, getTvaAlertLabel } from '@/lib/tva-validation'
 
@@ -132,13 +133,13 @@ function CA3Section({ data }: { data: ReturnType<typeof computeTVA>; debut: stri
                 aria-label={`Copier la case ${row.id}`}
                 onClick={() => copyToClipboard(row.id, row.value)}
               >
-                {copiedCase === row.id ? '✓' : '📋'}
+                {copiedCase === row.id ? <Check size={13} /> : <Copy size={13} />}
               </button>
             </div>
           ))}
           <div className="dash-ca3-footer">
             <a href="https://cfspro.impots.gouv.fr" target="_blank" rel="noopener noreferrer">
-              Déclarer sur impots.gouv.fr →
+              Déclarer sur impots.gouv.fr
             </a>
             <p style={{ margin: 0 }}>Transmission manuelle — Compte-Pote n&apos;est pas connecté à la DGFiP.</p>
           </div>
@@ -250,7 +251,7 @@ function TvaSplitPanel({ row, onSave, onClose }: {
             Total TTC : <strong>{formatEur(totalTtc)}</strong>
             {Math.abs(diff) >= 0.02
               ? <span style={{ marginLeft: 16, color: '#dc2626' }}>Écart {diff > 0 ? '+' : ''}{formatEur(diff)} — ajustez les HT</span>
-              : totalTtc > 0 && <span style={{ marginLeft: 16, color: '#16a34a' }}>✓ Correspond au TTC</span>}
+              : totalTtc > 0 && <span style={{ marginLeft: 16, color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={13} /> Correspond au TTC</span>}
           </div>
           {error && <div className="dash-error" style={{ marginTop: 12 }}>{error}</div>}
         </div>
@@ -310,8 +311,8 @@ function TauxCell({ row, onSave, onSplitClick }: {
             {r} %
           </button>
         ))}
-        <button type="button" style={{ padding: '2px 4px', fontSize: 11, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--pencil)' }}
-          onClick={() => setEditing(false)}>✕</button>
+        <button type="button" style={{ padding: '2px 4px', fontSize: 11, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--pencil)', display: 'inline-flex', alignItems: 'center' }}
+          onClick={() => setEditing(false)}><X size={14} /></button>
       </div>
     )
   }
@@ -325,8 +326,8 @@ function TauxCell({ row, onSave, onSplitClick }: {
       <button type="button" title="Ventiler la TVA" onMouseDown={e => e.stopPropagation()}
         onClick={e => { e.stopPropagation(); onSplitClick() }}
         style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 2, cursor: 'pointer', fontSize: 10, padding: '1px 4px', color: 'var(--pencil)', lineHeight: 1 }}>⊞</button>
-      {saveStatus && <span style={{ fontSize: 10, color: statusColor }}>
-        {saveStatus === 'saving' ? '···' : saveStatus === 'saved' ? '✓' : '✕'}
+      {saveStatus && <span style={{ fontSize: 10, color: statusColor, display: 'inline-flex', alignItems: 'center' }}>
+        {saveStatus === 'saving' ? '···' : saveStatus === 'saved' ? <Check size={13} /> : <X size={13} />}
       </span>}
     </span>
   )
@@ -381,8 +382,8 @@ function EditableCell({ row, field, display, onSave }: {
     <span onClick={() => { setEditVal(rawVal); setEditing(true) }} title="Cliquer pour modifier"
       style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 20 }}>
       <span>{display}</span>
-      {saveStatus && <span style={{ fontSize: 10, color: statusColor }}>
-        {saveStatus === 'saving' ? '···' : saveStatus === 'saved' ? '✓' : '✕'}
+      {saveStatus && <span style={{ fontSize: 10, color: statusColor, display: 'inline-flex', alignItems: 'center' }}>
+        {saveStatus === 'saving' ? '···' : saveStatus === 'saved' ? <Check size={13} /> : <X size={13} />}
       </span>}
     </span>
   )

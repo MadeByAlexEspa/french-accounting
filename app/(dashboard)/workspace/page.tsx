@@ -838,7 +838,7 @@ function EquipeSection({
                     style={{ fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
                     onClick={() => handleCopy(resendUrl, 'resend')}
                   >
-                    {copiedId === 'resend' ? '✓ Copié' : 'Copier'}
+                    {copiedId === 'resend' ? <><Check size={13} /> Copié</> : 'Copier'}
                   </button>
                 </div>
               )}

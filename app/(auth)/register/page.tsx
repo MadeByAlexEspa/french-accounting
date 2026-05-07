@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { register } from './actions'
+import { Check } from 'lucide-react'
 
 function slugify(name: string) {
   return name
@@ -69,7 +70,7 @@ export default function RegisterPage() {
               'Résiliable à tout moment',
               "3 € / mois — moins qu'un café",
             ].map(f => (
-              <li key={f}><span className="alf-check">✓</span> {f}</li>
+              <li key={f}><Check size={13} className="alf-check" /> {f}</li>
             ))}
           </ul>
         </div>
@@ -142,7 +143,7 @@ export default function RegisterPage() {
             {error && <div className="auth-error" role="alert">{error}</div>}
 
             <button type="submit" disabled={loading} className="auth-btn">
-              {loading ? 'Création en cours…' : 'Créer mon espace de travail →'}
+              {loading ? 'Création en cours…' : 'Créer mon espace de travail'}
             </button>
           </form>
 

@@ -5,18 +5,19 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Workspace } from '@/lib/types/database'
+import { PenLine, Menu, X, Home, ArrowLeftRight, Percent, BookOpen, Receipt, Plug, Settings, LogOut } from 'lucide-react'
 
 const NAV_MAIN = [
-  { href: '/dashboard',      label: 'Accueil' },
-  { href: '/transactions',   label: 'Transactions' },
-  { href: '/tva',            label: 'TVA' },
-  { href: '/exercice',       label: 'Comptes annuels' },
-  { href: '/notes-de-frais', label: 'Notes de frais' },
+  { href: '/dashboard',      label: 'Accueil',         icon: Home },
+  { href: '/transactions',   label: 'Transactions',    icon: ArrowLeftRight },
+  { href: '/tva',            label: 'TVA',             icon: Percent },
+  { href: '/exercice',       label: 'Comptes annuels', icon: BookOpen },
+  { href: '/notes-de-frais', label: 'Notes de frais',  icon: Receipt },
 ]
 
 const NAV_FOOTER = [
-  { href: '/integrations', label: 'Connexions API' },
-  { href: '/workspace',    label: 'Paramètres' },
+  { href: '/integrations', label: 'Connexions API', icon: Plug },
+  { href: '/workspace',    label: 'Paramètres',     icon: Settings },
 ]
 
 interface Props {
@@ -55,7 +56,7 @@ export default function Sidebar({ workspace, userEmail, userName }: Props) {
   const navContent = (
     <>
       <div className="sb-brand">
-        <span className="sb-brand-name">✎ Compte-Pote</span>
+        <span className="sb-brand-name" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><PenLine size={15} style={{ flexShrink: 0 }} /> Compte-Pote</span>
       </div>
 
       {workspace && (
@@ -70,8 +71,9 @@ export default function Sidebar({ workspace, userEmail, userName }: Props) {
       )}
 
       <nav className="sb-nav">
-        {NAV_MAIN.map(({ href, label }) => (
+        {NAV_MAIN.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href} className={`sb-item ${isActive(href) ? 'sb-item-active' : ''}`}>
+            <Icon size={15} style={{ flexShrink: 0 }} />
             {label}
           </Link>
         ))}
@@ -79,8 +81,9 @@ export default function Sidebar({ workspace, userEmail, userName }: Props) {
 
       <div className="sb-footer">
         <div className="sb-footer-section">
-          {NAV_FOOTER.map(({ href, label }) => (
+          {NAV_FOOTER.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} className={`sb-item ${isActive(href) ? 'sb-item-active' : ''}`}>
+              <Icon size={15} style={{ flexShrink: 0 }} />
               {label}
             </Link>
           ))}
@@ -89,6 +92,7 @@ export default function Sidebar({ workspace, userEmail, userName }: Props) {
           <kbd className="dash-kbd" style={{ fontSize: 10 }}>⌘K</kbd> palette
         </div>
         <button onClick={handleLogout} className="sb-item" style={{ borderLeft: '3px solid transparent' }}>
+          <LogOut size={15} style={{ flexShrink: 0 }} />
           Déconnexion
         </button>
       </div>
@@ -104,9 +108,9 @@ export default function Sidebar({ workspace, userEmail, userName }: Props) {
           onClick={() => setMobileOpen(v => !v)}
           aria-label={mobileOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
         >
-          {mobileOpen ? '✕' : '☰'}
+          {mobileOpen ? <X size={18} /> : <Menu size={18} />}
         </button>
-        <span className="sb-topbar-logo">✎ Compte-Pote</span>
+        <span className="sb-topbar-logo" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><PenLine size={15} style={{ flexShrink: 0 }} /> Compte-Pote</span>
         <div style={{ width: 40 }} />
       </header>
 

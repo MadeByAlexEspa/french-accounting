@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { PenLine, ChevronLeft } from 'lucide-react'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail]     = useState('')
@@ -31,7 +32,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="auth-card">
       <div className="auth-logo">
-        <span className="auth-logo-name">✎ Compte-Pote</span>
+        <span className="auth-logo-name"><PenLine size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} /> Compte-Pote</span>
       </div>
 
       <h1 className="auth-title">Mot de passe oublié</h1>
@@ -43,7 +44,7 @@ export default function ForgotPasswordPage() {
             est associé à un compte. Vérifiez aussi vos spams.
           </div>
           <p className="auth-footer">
-            <Link href="/login" className="auth-link">← Retour à la connexion</Link>
+            <Link href="/login" className="auth-link"><ChevronLeft size={14} style={{ verticalAlign: 'middle' }} /> Retour à la connexion</Link>
           </p>
         </>
       ) : (
@@ -73,7 +74,7 @@ export default function ForgotPasswordPage() {
             </button>
           </form>
           <p className="auth-footer">
-            <Link href="/login" className="auth-link">← Retour à la connexion</Link>
+            <Link href="/login" className="auth-link"><ChevronLeft size={14} style={{ verticalAlign: 'middle' }} /> Retour à la connexion</Link>
           </p>
         </>
       )}

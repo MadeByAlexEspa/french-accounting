@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Check } from 'lucide-react'
 
 function InvitedBanner() {
   const searchParams = useSearchParams()
@@ -62,7 +63,7 @@ export default function LoginPage() {
               'Agent comptable IA inclus',
               'Connexion Qonto & Shine',
             ].map(f => (
-              <li key={f}><span className="alf-check">✓</span> {f}</li>
+              <li key={f}><Check size={13} className="alf-check" /> {f}</li>
             ))}
           </ul>
         </div>
@@ -120,7 +121,7 @@ export default function LoginPage() {
             {error && <div className="auth-error" role="alert">{error}</div>}
 
             <button type="submit" disabled={loading} className="auth-btn">
-              {loading ? 'Connexion…' : 'Se connecter →'}
+              {loading ? 'Connexion…' : 'Se connecter'}
             </button>
           </form>
 

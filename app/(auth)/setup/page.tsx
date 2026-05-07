@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { setupWorkspace } from './actions'
+import { PenLine } from 'lucide-react'
 
 export default function SetupPage() {
   const router = useRouter()
@@ -24,7 +25,7 @@ export default function SetupPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-logo">
-          <span className="auth-logo-name">✎ Compte-Pote</span>
+          <span className="auth-logo-name"><PenLine size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} /> Compte-Pote</span>
         </div>
 
         <div className="auth-form-header">
@@ -50,7 +51,7 @@ export default function SetupPage() {
           {error && <div className="auth-error" role="alert">{error}</div>}
 
           <button type="submit" disabled={loading} className="auth-btn">
-            {loading ? 'Création…' : 'Créer mon espace →'}
+            {loading ? 'Création…' : 'Créer mon espace'}
           </button>
         </form>
 
