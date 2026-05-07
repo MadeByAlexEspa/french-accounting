@@ -725,6 +725,7 @@ body {
 .dash-table .right { text-align: right; }
 .dash-table .center { text-align: center; }
 .dash-table tr:hover td { background: var(--offwhite); }
+.dash-table tr.no-row-hover:hover td { background: inherit; }
 .dash-empty { font-family: 'Courier Prime', monospace; font-size: 13px; color: var(--pencil); padding: 24px 0; text-align: center; }
 
 .dash-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-sm); font-family: 'Courier Prime', monospace; font-size: 11px; font-weight: 500; }

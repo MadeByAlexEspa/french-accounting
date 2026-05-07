@@ -195,7 +195,7 @@ function BilanRow({ label, compte, liasse, montant, positive, hide0 }: {
 
 function SubtotalRow({ label, liasse, montant, bold }: { label: string; liasse?: string; montant: number; bold?: boolean }) {
   return (
-    <tr style={{ borderTop: '1px solid var(--rule)', background: bold ? 'var(--ink)' : undefined }}>
+    <tr className="no-row-hover" style={{ borderTop: '1px solid var(--rule)', background: bold ? 'var(--ink)' : undefined }}>
       <td style={{ padding: '8px 12px', fontWeight: bold ? 700 : 600, color: bold ? '#fff' : undefined }}>
         {label}
         {liasse && (bold
@@ -409,16 +409,16 @@ export default function ExercicePage() {
           <h1 className="dash-title">Comptes annuels</h1>
           <p className="dash-subtitle">Compte de résultat & Bilan — PCG règlement ANC n°2014-03</p>
         </div>
-        <button
-          className="dash-btn-ghost no-print"
-          onClick={() => { window.location.href = '/api/fec/' + debut.slice(0, 4) }}
-        >
-          ↓ FEC
-        </button>
-        <button className="dash-btn-ghost no-print" onClick={() => window.print()}>
-          ↓ Imprimer / PDF
-        </button>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="no-print" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            className="dash-btn-ghost"
+            onClick={() => { window.location.href = '/api/fec/' + debut.slice(0, 4) }}
+          >
+            ↓ FEC
+          </button>
+          <button className="dash-btn-ghost" onClick={() => window.print()}>
+            ↓ Imprimer / PDF
+          </button>
           <input type="date" className="dash-filter-input" value={debut} onChange={e => handleDebut(e.target.value)} />
           <ChevronRight size={13} style={{ color: 'var(--pencil)' }} />
           <input type="date" className="dash-filter-input" value={fin}   onChange={e => handleFin(e.target.value)} />
