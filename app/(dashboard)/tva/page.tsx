@@ -452,7 +452,7 @@ function TvaDeductibleModal({
                     {filtered.map(row => {
                       const erreur = isTvaErronnee(row)
                       return (
-                        <tr key={row.id} style={erreur ? { background: 'rgba(239,68,68,0.06)' } : undefined}>
+                        <tr key={row.id} style={erreur ? { background: '#fefce8' } : undefined}>
                           <td style={{ fontSize: 12, color: 'var(--pencil)' }}>{row.date}</td>
                           <td>
                             {row.fournisseur}
@@ -738,7 +738,7 @@ export default function TVAPage() {
                       {ff.slice(fPage * 10, fPage * 10 + 10).map(f => {
                         const erreur = isTvaErronnee(f)
                         return (
-                        <tr key={f.id} style={erreur ? { background: 'rgba(239,68,68,0.06)' } : undefined}>
+                        <tr key={f.id} style={erreur ? { background: '#fefce8' } : undefined}>
                           <td>{f.date}</td>
                           <td>
                             {f.client}
@@ -814,7 +814,7 @@ export default function TVAPage() {
                       {fd.slice(dPage * 10, dPage * 10 + 10).map(d => {
                         const erreur = isTvaErronnee(d)
                         return (
-                        <tr key={d.id} style={erreur ? { background: 'rgba(239,68,68,0.06)' } : undefined}>
+                        <tr key={d.id} style={erreur ? { background: '#fefce8' } : undefined}>
                           <td>{d.date}</td>
                           <td>
                             {d.fournisseur}

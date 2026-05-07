@@ -923,8 +923,9 @@ export default function TransactionsPage() {
       ? <span className="dash-badge dash-badge-blue" style={{ fontSize: 10 }}>Multi</span>
       : `${row.taux_tva} %`
 
+    const erreur = isTvaErronnee(row)
     return (
-      <tr key={key} style={{ background: selectedIds.has(key) ? '#f0f4ff' : undefined }}>
+      <tr key={key} style={{ background: selectedIds.has(key) ? '#f0f4ff' : erreur ? '#fefce8' : undefined }}>
         <td style={{ textAlign: 'center', width: 32 }}>
           <input type="checkbox" checked={selectedIds.has(key)} onChange={() => toggleSelect(key)} />
         </td>
@@ -940,19 +941,21 @@ export default function TransactionsPage() {
             display={row.date} onSave={handleCellSave} />
         </td>
         <td>
-          <InlineCell row={row} field={isEntree ? 'client' : 'fournisseur'} editType="text" value={tiers}
-            display={tiers || '—'} onSave={handleCellSave} />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <InlineCell row={row} field={isEntree ? 'client' : 'fournisseur'} editType="text" value={tiers}
+              display={tiers || '—'} onSave={handleCellSave} />
+            {erreur && (
+              <span title={getTvaAlertLabel(row)} style={{ display: 'inline-flex', alignItems: 'center', color: '#f59e0b', cursor: 'default', flexShrink: 0 }}>
+                <AlertTriangle size={12} />
+              </span>
+            )}
+          </span>
         </td>
         <td className="right" style={{ fontFamily: 'Courier Prime,monospace', fontSize: 13 }}>{formatEur(row.montant_ht)}</td>
         <td className="center">
           <InlineCell row={row} field="taux_tva" editType={row.taux_tva === -1 ? undefined : 'pills'} value={String(row.taux_tva)}
             display={tvaBadge} options={tvaOptions} onSave={handleCellSave}
             onSplitClick={() => setSplitTarget(row)} />
-          {isTvaErronnee(row) && (
-            <span title={getTvaAlertLabel(row)} style={{ display: 'inline-flex', alignItems: 'center', marginTop: 2, color: '#f59e0b', cursor: 'default' }}>
-              <AlertTriangle size={13} />
-            </span>
-          )}
         </td>
         <td className="right">
           <InlineCell row={row} field="montant_ttc" editType="number" value={String(row.montant_ttc)}
