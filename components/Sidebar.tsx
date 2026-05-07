@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Workspace } from '@/lib/types/database'
 import { PenLine, Menu, X, Home, ArrowLeftRight, Percent, BookOpen, Receipt, Plug, Settings, LogOut } from 'lucide-react'
+import { TvaAlertBadge } from '@/components/TvaAlertBadge'
 
 const NAV_MAIN = [
   { href: '/dashboard',      label: 'Accueil',         icon: Home },
@@ -74,7 +75,8 @@ export default function Sidebar({ workspace, userEmail, userName }: Props) {
         {NAV_MAIN.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href} className={`sb-item ${isActive(href) ? 'sb-item-active' : ''}`}>
             <Icon size={15} style={{ flexShrink: 0 }} />
-            {label}
+            <span style={{ flex: 1 }}>{label}</span>
+            {href === '/tva' && <TvaAlertBadge />}
           </Link>
         ))}
       </nav>

@@ -6,6 +6,8 @@ export type TvaRow = {
   tva_lines?: unknown
 }
 
+export const VALID_TVA_RATES = [0, 5.5, 10, 20]
+
 function round2(n: number) { return Math.round(n * 100) / 100 }
 
 export function isTvaErronnee(row: TvaRow): boolean {
@@ -16,6 +18,9 @@ export function isTvaErronnee(row: TvaRow): boolean {
 
   // No rate or valid multi-rate → skip
   if (taux === null || taux === undefined || taux === -1) return false
+
+  // Non-standard rate (not 0%, 5.5%, 10%, 20%)
+  if (!VALID_TVA_RATES.includes(taux)) return true
 
   const ht = Math.abs(row.montant_ht)
   const tva = Math.abs(row.montant_tva)
@@ -38,6 +43,7 @@ export function isTvaErronnee(row: TvaRow): boolean {
 export function getTvaAlertLabel(row: TvaRow): string {
   const taux = row.taux_tva
   if (taux === -1 && !row.tva_lines) return 'TVA à ventiler'
+  if (taux !== null && taux !== -1 && !VALID_TVA_RATES.includes(taux)) return `Taux ${taux}% non standard`
   if (taux === 0 && Math.abs(row.montant_tva) > 0.01) return 'Taux 0% incohérent'
   return 'TVA à corriger'
 }
