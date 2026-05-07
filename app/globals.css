@@ -686,7 +686,7 @@ body {
 .dash-btn-danger:hover:not(:disabled) { opacity: 0.85; }
 .dash-btn-danger:disabled { opacity: 0.5; cursor: default; }
 
-.dash-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.dash-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
 .dash-kpi-card {
   background: #fff;
   border: 1px solid var(--border);
@@ -1248,7 +1248,7 @@ body {
 @media (max-width: 900px) {
   .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); }
 }
-@media (max-width: 600px) {
+@media (max-width: 520px) {
   .dash-kpi-grid { grid-template-columns: 1fr; }
 }
 .invite-form-wrap {
@@ -1377,7 +1377,6 @@ body {
 /* Large screens: > 1280px */
 @media (min-width: 1280px) {
   .sb-content { padding: 40px 56px; }
-  .dash-kpi-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
 /* Mobile: < 768px — sidebar becomes a drawer */
@@ -1419,7 +1418,7 @@ body {
   .dash-page { max-width: 100%; }
   .dash-header { flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
   .dash-title { font-size: 22px; }
-  .dash-kpi-grid { grid-template-columns: 1fr; }
+  .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .dash-kpi-card { padding: 16px 20px; }
   .dash-kpi-value { font-size: 24px; }
 
@@ -1718,3 +1717,97 @@ body {
 }
 .adm-header-title { font-family: 'Special Elite', serif; font-size: 18px; color: var(--ink); }
 .adm-page { max-width: 1100px; margin: 0 auto; padding: 32px 32px; }
+
+/* ── Hiérarchie visuelle tables exercice (#11) ────────────────────────────── */
+.dash-table-group-header td {
+  font-family: 'Courier Prime', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--pencil);
+  background: var(--offwhite);
+  padding: 8px 12px;
+  border-top: 1px solid var(--rule);
+}
+.dash-table-subtotal td {
+  font-weight: 600;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+}
+.dash-table-total td {
+  font-weight: 700;
+  background: var(--ink) !important;
+  color: #fff !important;
+  font-family: 'Courier Prime', monospace;
+  font-size: 14px;
+}
+.dash-table tr.no-row-hover:hover td { background: inherit; }
+
+/* ── Pill tabs exercice (#10) ─────────────────────────────────────────────── */
+.dash-pill-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  padding: 4px;
+  background: var(--offwhite);
+  border-radius: var(--radius-md);
+  width: fit-content;
+}
+.dash-pill-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pencil);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.dash-pill-tab:hover { background: #fff; color: var(--ink); }
+.dash-pill-tab-active {
+  background: #fff;
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+/* ── Résumé exécutif (#6) ─────────────────────────────────────────────────── */
+.dash-exec-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--offwhite);
+  border-left: 3px solid var(--ink);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.6;
+}
+.dash-exec-icon {
+  font-family: 'Courier Prime', monospace;
+  font-size: 18px;
+  color: var(--pencil);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.dash-exec-text { margin: 0; font-family: 'Inter', sans-serif; }
+
+/* ── Accessibilité — sr-only (#A11Y-5) ───────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border-width: 0;
+}

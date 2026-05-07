@@ -11,14 +11,23 @@ function formatEur(n: number) { return n.toLocaleString('fr-FR', { style: 'curre
 function round2(n: number) { return Math.round(n * 100) / 100 }
 function today() { return new Date().toISOString().slice(0, 10) }
 
+function formatDateFr(iso: string) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 function presets() {
   const y = new Date().getFullYear()
+  const todayStr = new Date().toISOString().slice(0, 10)
   return [
-    { label: 'Cette année',      debut: `${y}-01-01`,   fin: today() },
+    { label: 'Cette année',      debut: `${y}-01-01`,   fin: todayStr },
     { label: 'Année complète',   debut: `${y}-01-01`,   fin: `${y}-12-31` },
     { label: 'Année précédente', debut: `${y-1}-01-01`, fin: `${y-1}-12-31` },
     { label: 'S1',               debut: `${y}-01-01`,   fin: `${y}-06-30` },
     { label: 'S2',               debut: `${y}-07-01`,   fin: `${y}-12-31` },
+    { label: 'T1',               debut: `${y}-01-01`,   fin: `${y}-03-31` },
+    { label: 'T2',               debut: `${y}-04-01`,   fin: `${y}-06-30` },
+    { label: 'T3',               debut: `${y}-07-01`,   fin: `${y}-09-30` },
+    { label: 'T4',               debut: `${y}-10-01`,   fin: `${y}-12-31` },
   ]
 }
 
@@ -152,9 +161,37 @@ function computeBilan(factures: Facture[], depenses: Depense[], debut: string, f
   }
 }
 
+// ── Export CSV (#4) ───────────────────────────────────────────────────────────
+
+function exportCSV(pnl: PnL, debut: string, fin: string) {
+  const BOM = '﻿'
+  const lines: string[] = [
+    `# Compte-Pote — Exercice ${debut} au ${fin}`,
+    'Type;Catégorie;Montant HT',
+  ]
+  Object.entries(pnl.produits).forEach(([cat, montant]) =>
+    lines.push(`Produit;${cat};${montant.toFixed(2)}`)
+  )
+  lines.push(`Total produits;;${pnl.total_produits.toFixed(2)}`)
+  Object.entries(pnl.charges).forEach(([cat, montant]) =>
+    lines.push(`Charge;${cat};${montant.toFixed(2)}`)
+  )
+  lines.push(`Total charges;;${pnl.total_charges.toFixed(2)}`)
+  lines.push(`Résultat net;;${pnl.resultat.toFixed(2)}`)
+
+  const blob = new Blob([BOM + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `compte-resultat-${debut}-${fin}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ── Bilan sub-components ──────────────────────────────────────────────────────
 
-function Ref({ v }: { v: string }) {
+function Ref({ v, show = true }: { v: string; show?: boolean }) {
+  if (!show) return null
   return (
     <span style={{ marginLeft: 8, fontSize: 10, fontFamily: 'Courier Prime,monospace', color: '#6b7280',
       background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 2, padding: '1px 5px', whiteSpace: 'nowrap' }}>
@@ -163,45 +200,45 @@ function Ref({ v }: { v: string }) {
   )
 }
 
-function GroupHeader({ label, liasse }: { label: string; liasse?: string }) {
+function GroupHeader({ label, liasse, showRef }: { label: string; liasse?: string; showRef?: boolean }) {
   return (
-    <tr style={{ background: 'var(--offwhite)' }}>
-      <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
-        textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>{label}</span>
-        {liasse && <Ref v={liasse} />}
+    <tr className="dash-table-group-header">
+      <td colSpan={2} style={{ padding: '8px 12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{label}</span>
+          {liasse && <Ref v={liasse} show={showRef} />}
+        </div>
       </td>
     </tr>
   )
 }
 
-function BilanRow({ label, compte, liasse, montant, positive, hide0 }: {
-  label: string; compte?: string; liasse?: string; montant: number; positive?: boolean; hide0?: boolean
+function BilanRow({ label, compte, liasse, montant, positive, hide0, showCompte }: {
+  label: string; compte?: string; liasse?: string; montant: number; positive?: boolean; hide0?: boolean; showCompte?: boolean
 }) {
   if (hide0 && montant === 0) return null
   const color = positive !== undefined ? (montant >= 0 ? (positive ? '#15803d' : '#dc2626') : '#dc2626') : undefined
   return (
     <tr>
       <td style={{ paddingLeft: 24 }}>
-        {compte && <span style={{ fontSize: 10, fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)', marginRight: 6 }}>{compte}</span>}
+        {compte && showCompte && <span style={{ fontSize: 10, fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)', marginRight: 6 }}>{compte}</span>}
         {label}
-        {liasse && <Ref v={liasse} />}
+        {liasse && <Ref v={liasse} show={showCompte} />}
       </td>
       <td className="right" style={{ fontFamily: 'Courier Prime,monospace', color }}>{formatEur(montant)}</td>
     </tr>
   )
 }
 
-function SubtotalRow({ label, liasse, montant, bold }: { label: string; liasse?: string; montant: number; bold?: boolean }) {
+function SubtotalRow({ label, liasse, montant, bold, showRef }: { label: string; liasse?: string; montant: number; bold?: boolean; showRef?: boolean }) {
   return (
     <tr className="no-row-hover" style={{ borderTop: '1px solid var(--rule)', background: bold ? 'var(--ink)' : undefined }}>
       <td style={{ padding: '8px 12px', fontWeight: bold ? 700 : 600, color: bold ? '#fff' : undefined }}>
         {label}
         {liasse && (bold
           ? <span style={{ marginLeft: 8, fontSize: 10, fontFamily: 'Courier Prime,monospace', color: '#d1d5db',
-              background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 2, padding: '1px 5px' }}>{liasse}</span>
-          : <Ref v={liasse} />
+              background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 2, padding: '1px 5px' }}>{showRef ? liasse : ''}</span>
+          : <Ref v={liasse} show={showRef} />
         )}
       </td>
       <td className="right" style={{ fontFamily: 'Courier Prime,monospace', fontWeight: bold ? 700 : 600, color: bold ? '#fff' : undefined }}>
@@ -211,9 +248,25 @@ function SubtotalRow({ label, liasse, montant, bold }: { label: string; liasse?:
   )
 }
 
+// ── Résumé exécutif (#6) ──────────────────────────────────────────────────────
+
+function ExecSummary({ pnl, debut, fin }: { pnl: PnL; debut: string; fin: string }) {
+  if (pnl.total_produits === 0 && pnl.total_charges === 0) return null
+  const marge = pnl.total_produits > 0 ? Math.round((pnl.resultat / pnl.total_produits) * 100) : null
+  const text = pnl.resultat >= 0
+    ? `Sur la période ${formatDateFr(debut)} – ${formatDateFr(fin)}, vous avez réalisé ${formatEur(pnl.total_produits)} de chiffre d'affaires pour ${formatEur(pnl.resultat)} de bénéfice${marge !== null ? ` (marge ${marge} %)` : ''}.`
+    : `Sur la période ${formatDateFr(debut)} – ${formatDateFr(fin)}, vos charges (${formatEur(pnl.total_charges)}) dépassent vos produits (${formatEur(pnl.total_produits)}) — déficit de ${formatEur(Math.abs(pnl.resultat))}.`
+  return (
+    <div className="dash-exec-summary">
+      <span className="dash-exec-icon">{pnl.resultat >= 0 ? '↗' : '↘'}</span>
+      <p className="dash-exec-text">{text}</p>
+    </div>
+  )
+}
+
 // ── Bilan Tab ─────────────────────────────────────────────────────────────────
 
-function BilanTab({ debut, fin, bilan }: { debut: string; fin: string; bilan: BilanData }) {
+function BilanTab({ debut, fin, bilan, vueComptable }: { debut: string; fin: string; bilan: BilanData; vueComptable: boolean }) {
   const totalImmobi     = round2(bilan.imm_incorp + bilan.imm_corp)
   const totalCirculant  = round2(bilan.creances_clients + bilan.credit_tva + bilan.disponibilites)
   const totalActif      = round2(totalImmobi + totalCirculant)
@@ -236,23 +289,23 @@ function BilanTab({ debut, fin, bilan }: { debut: string; fin: string; bilan: Bi
           <div className="dash-table-wrap"><table className="dash-table">
             <tbody>
               {/* Actif immobilisé */}
-              <GroupHeader label="Actif immobilisé" liasse="Formulaire 2050" />
-              <BilanRow label="Immobilisations incorporelles (net)" compte="(20x)" liasse="2050 · AU" montant={bilan.imm_incorp} hide0 />
-              <BilanRow label="Immobilisations corporelles (net)"   compte="(21x)" liasse="2050 · BP" montant={bilan.imm_corp}   hide0 />
+              <GroupHeader label="Actif immobilisé" liasse="Formulaire 2050" showRef={vueComptable} />
+              <BilanRow label="Immobilisations incorporelles (net)" compte="(20x)" liasse="2050 · AU" montant={bilan.imm_incorp} hide0 showCompte={vueComptable} />
+              <BilanRow label="Immobilisations corporelles (net)"   compte="(21x)" liasse="2050 · BP" montant={bilan.imm_corp}   hide0 showCompte={vueComptable} />
               {totalImmobi === 0
                 ? <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 24 }}>Aucune immobilisation (catégories 20x, 21x).</td></tr>
-                : <SubtotalRow label="Total actif immobilisé" liasse="2050 · BV" montant={totalImmobi} />}
+                : <SubtotalRow label="Total actif immobilisé" liasse="2050 · BV" montant={totalImmobi} showRef={vueComptable} />}
 
               {/* Actif circulant */}
-              <GroupHeader label="Actif circulant" liasse="Formulaire 2050" />
-              <BilanRow label="Créances clients"        compte="(41)"    liasse="2050 · CT" montant={bilan.creances_clients} hide0 />
-              <BilanRow label="Crédit de TVA"           compte="(44567)" liasse="2050 · CW" montant={bilan.credit_tva}       hide0 />
-              <BilanRow label="Disponibilités – Banque" compte="(512)"   liasse="2050 · DB" montant={bilan.disponibilites}   hide0 />
+              <GroupHeader label="Actif circulant" liasse="Formulaire 2050" showRef={vueComptable} />
+              <BilanRow label="Créances clients"        compte="(41)"    liasse="2050 · CT" montant={bilan.creances_clients} hide0 showCompte={vueComptable} />
+              <BilanRow label="Crédit de TVA"           compte="(44567)" liasse="2050 · CW" montant={bilan.credit_tva}       hide0 showCompte={vueComptable} />
+              <BilanRow label="Disponibilités – Banque" compte="(512)"   liasse="2050 · DB" montant={bilan.disponibilites}   hide0 showCompte={vueComptable} />
               {totalCirculant === 0 && <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 24 }}>Aucun actif circulant.</td></tr>}
-              <SubtotalRow label="Total actif circulant" liasse="2050 · DH" montant={totalCirculant} />
+              <SubtotalRow label="Total actif circulant" liasse="2050 · DH" montant={totalCirculant} showRef={vueComptable} />
             </tbody>
             <tfoot>
-              <SubtotalRow label="TOTAL ACTIF" liasse="2050 · DP" montant={totalActif} bold />
+              <SubtotalRow label="TOTAL ACTIF" liasse="2050 · DP" montant={totalActif} bold showRef={vueComptable} />
             </tfoot>
           </table></div>
         </div>
@@ -263,40 +316,41 @@ function BilanTab({ debut, fin, bilan }: { debut: string; fin: string; bilan: Bi
           <div className="dash-table-wrap"><table className="dash-table">
             <tbody>
               {/* Capitaux propres */}
-              <GroupHeader label="Capitaux propres" liasse="Formulaire 2051" />
-              <BilanRow label="Capital social"        compte="(101)" liasse="2051 · DA" montant={bilan.capital}         hide0 />
-              <BilanRow label="Compte exploitant"     compte="(108)" liasse="2051 · DH" montant={bilan.compte_exploit}  hide0 />
-              <BilanRow label="Report à nouveau"      compte="(11)"  liasse="2051 · DG" montant={bilan.report_a_nouveau} hide0 />
+              <GroupHeader label="Capitaux propres" liasse="Formulaire 2051" showRef={vueComptable} />
+              <BilanRow label="Capital social"        compte="(101)" liasse="2051 · DA" montant={bilan.capital}         hide0 showCompte={vueComptable} />
+              <BilanRow label="Compte exploitant"     compte="(108)" liasse="2051 · DH" montant={bilan.compte_exploit}  hide0 showCompte={vueComptable} />
+              <BilanRow label="Report à nouveau"      compte="(11)"  liasse="2051 · DG" montant={bilan.report_a_nouveau} hide0 showCompte={vueComptable} />
               <BilanRow
                 label={bilan.resultat >= 0 ? 'Résultat de l\'exercice (bénéfice)' : 'Résultat de l\'exercice (déficit)'}
                 compte={bilan.resultat >= 0 ? '(120)' : '(129)'}
                 liasse="2051 · DI/DJ"
                 montant={bilan.resultat}
                 positive={bilan.resultat >= 0}
+                showCompte={vueComptable}
               />
               {totalCapPropres === 0 && <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 24 }}>Aucune entrée (101, 108…).</td></tr>}
-              <SubtotalRow label="Total capitaux propres" liasse="2051 · DM" montant={totalCapPropres} />
+              <SubtotalRow label="Total capitaux propres" liasse="2051 · DM" montant={totalCapPropres} showRef={vueComptable} />
 
               {/* Dettes financières */}
               {totalDettesFin > 0 && (
                 <>
-                  <GroupHeader label="Dettes financières" liasse="Formulaire 2051" />
-                  <BilanRow label="Emprunts bancaires"          compte="(164)" liasse="2051 · FB" montant={bilan.emprunts} hide0 />
-                  <BilanRow label="Comptes courants associés"   compte="(455)" liasse="2051 · FC" montant={bilan.cca}      hide0 />
-                  <SubtotalRow label="Total dettes financières" liasse="2051 · FJ" montant={totalDettesFin} />
+                  <GroupHeader label="Dettes financières" liasse="Formulaire 2051" showRef={vueComptable} />
+                  <BilanRow label="Emprunts bancaires"          compte="(164)" liasse="2051 · FB" montant={bilan.emprunts} hide0 showCompte={vueComptable} />
+                  <BilanRow label="Comptes courants associés"   compte="(455)" liasse="2051 · FC" montant={bilan.cca}      hide0 showCompte={vueComptable} />
+                  <SubtotalRow label="Total dettes financières" liasse="2051 · FJ" montant={totalDettesFin} showRef={vueComptable} />
                 </>
               )}
 
               {/* Dettes d'exploitation */}
-              <GroupHeader label="Dettes d'exploitation" liasse="Formulaire 2051" />
-              <BilanRow label="Dettes fournisseurs" compte="(40)"    liasse="2051 · FE" montant={bilan.dettes_fournisseurs} hide0 />
-              <BilanRow label="TVA à décaisser"     compte="(44551)" liasse="2051 · FF" montant={bilan.tva_a_decaisser}    hide0 />
-              <BilanRow label="Découvert bancaire"  compte="(564)"   liasse="2051 · FB" montant={bilan.decouvert}          hide0 />
+              <GroupHeader label="Dettes d'exploitation" liasse="Formulaire 2051" showRef={vueComptable} />
+              <BilanRow label="Dettes fournisseurs" compte="(40)"    liasse="2051 · FE" montant={bilan.dettes_fournisseurs} hide0 showCompte={vueComptable} />
+              <BilanRow label="TVA à décaisser"     compte="(44551)" liasse="2051 · FF" montant={bilan.tva_a_decaisser}    hide0 showCompte={vueComptable} />
+              <BilanRow label="Découvert bancaire"  compte="(564)"   liasse="2051 · FB" montant={bilan.decouvert}          hide0 showCompte={vueComptable} />
               {totalDettesExpl === 0 && <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 24 }}>Aucune dette d'exploitation.</td></tr>}
-              <SubtotalRow label="Total dettes d'exploitation" liasse="2051 · FJ" montant={totalDettesExpl} />
+              <SubtotalRow label="Total dettes d'exploitation" liasse="2051 · FJ" montant={totalDettesExpl} showRef={vueComptable} />
             </tbody>
             <tfoot>
-              <SubtotalRow label="TOTAL PASSIF" liasse="2051 · FL" montant={totalPassif} bold />
+              <SubtotalRow label="TOTAL PASSIF" liasse="2051 · FL" montant={totalPassif} bold showRef={vueComptable} />
             </tfoot>
           </table></div>
         </div>
@@ -353,6 +407,16 @@ export default function ExercicePage() {
   const [tab, setTab]           = useState<Tab>('resultat')
   const [activePreset, setActivePreset] = useState<number | null>(0)
 
+  const [vueComptable, setVueComptable] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('exercice_vue_comptable') ?? 'false') } catch { return false }
+  })
+
+  function toggleVueComptable() {
+    const next = !vueComptable
+    setVueComptable(next)
+    try { localStorage.setItem('exercice_vue_comptable', JSON.stringify(next)) } catch { /* ignore */ }
+  }
+
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(LS_EXERCICE) ?? 'null')
@@ -407,31 +471,70 @@ export default function ExercicePage() {
       <div className="dash-header">
         <div>
           <h1 className="dash-title">Comptes annuels</h1>
-          <p className="dash-subtitle">Compte de résultat & Bilan — PCG règlement ANC n°2014-03</p>
+          <p className="dash-subtitle">
+            {vueComptable
+              ? 'Compte de résultat & Bilan — PCG règlement ANC n°2014-03'
+              : 'Compte de résultat & Bilan — Vue simplifiée'}
+          </p>
         </div>
         <div className="no-print" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             className="dash-btn-ghost"
+            onClick={toggleVueComptable}
+            style={{ fontSize: 11 }}
+            title={vueComptable ? 'Masquer les références fiscales' : 'Afficher les références fiscales (mode comptable)'}
+          >
+            {vueComptable ? '◆ Vue comptable' : '◇ Vue comptable'}
+          </button>
+          <button
+            className="dash-btn-ghost"
+            style={{ fontSize: 12 }}
+            onClick={() => exportCSV(pnl, debut, fin)}
+            disabled={loading || pnl.total_produits === 0}
+            title="Télécharger le compte de résultat en CSV (compatible Excel)"
+            aria-label="Télécharger le compte de résultat en CSV"
+          >
+            ↓ CSV
+          </button>
+          <button
+            className="dash-btn-ghost"
+            aria-label="Télécharger le Fichier des Écritures Comptables (FEC)"
+            title="Fichier des Écritures Comptables — requis par l'administration fiscale"
             onClick={() => { window.location.href = '/api/fec/' + debut.slice(0, 4) }}
           >
             ↓ FEC
           </button>
-          <button className="dash-btn-ghost" onClick={() => window.print()}>
+          <button
+            className="dash-btn-ghost"
+            aria-label="Imprimer ou exporter en PDF"
+            onClick={() => window.print()}
+          >
             ↓ Imprimer / PDF
           </button>
-          <input type="date" className="dash-filter-input" value={debut} onChange={e => handleDebut(e.target.value)} />
-          <ChevronRight size={13} style={{ color: 'var(--pencil)' }} />
-          <input type="date" className="dash-filter-input" value={fin}   onChange={e => handleFin(e.target.value)} />
+          <input type="date" className="dash-filter-input" value={debut} onChange={e => handleDebut(e.target.value)} aria-label="Date de début" />
+          <ChevronRight size={13} style={{ color: 'var(--pencil)' }} aria-hidden="true" />
+          <input type="date" className="dash-filter-input" value={fin}   onChange={e => handleFin(e.target.value)} aria-label="Date de fin" />
         </div>
       </div>
 
       <div className="no-print" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
-        {ps.map((p, i) => (
-          <button key={p.label}
-            className="dash-btn-ghost"
-            style={{ fontSize: 12, padding: '6px 12px', fontWeight: activePreset === i ? 700 : undefined, borderColor: activePreset === i ? 'var(--ink)' : undefined }}
-            onClick={() => applyPreset(i)}>{p.label}</button>
-        ))}
+        {ps.map((p, i) => {
+          const isFuture = new Date(p.debut) > new Date()
+          return (
+            <button key={p.label}
+              className="dash-btn-ghost"
+              style={{
+                fontSize: 12, padding: '6px 12px',
+                fontWeight: activePreset === i ? 700 : undefined,
+                borderColor: activePreset === i ? 'var(--ink)' : undefined,
+                opacity: isFuture ? 0.45 : 1,
+              }}
+              onClick={() => applyPreset(i)}
+            >
+              {p.label}
+            </button>
+          )
+        })}
       </div>
 
       {loading && <div className="dash-loading">Chargement…</div>}
@@ -462,77 +565,130 @@ export default function ExercicePage() {
                   <p className="dash-kpi-sub">Déficit</p>
                 </div>
             }
+            {(() => {
+              const marge = pnl.total_produits > 0
+                ? Math.round((pnl.resultat / pnl.total_produits) * 100 * 10) / 10
+                : null
+              const margeColor = marge === null ? 'var(--pencil)'
+                : marge < 0 ? '#dc2626'
+                : marge < 15 ? '#d97706'
+                : '#15803d'
+              return (
+                <div className="dash-kpi-card">
+                  <p className="dash-kpi-label">Taux de marge</p>
+                  <p className="dash-kpi-value" style={{ color: margeColor }}>
+                    {marge === null ? '—' : `${marge} %`}
+                  </p>
+                  <p className="dash-kpi-sub">Résultat / CA HT</p>
+                </div>
+              )
+            })()}
           </div>
 
-          <div className="dash-tabs no-print">
-            <button className={`dash-tab ${tab === 'resultat' ? 'dash-tab-active' : ''}`} onClick={() => handleTab('resultat')}>Compte de résultat</button>
-            <button className={`dash-tab ${tab === 'bilan' ? 'dash-tab-active' : ''}`} onClick={() => handleTab('bilan')}>Bilan simplifié</button>
+          <ExecSummary pnl={pnl} debut={debut} fin={fin} />
+
+          <div role="tablist" aria-label="Vues des comptes annuels" className="dash-pill-tabs no-print">
+            <button
+              role="tab"
+              id="tab-resultat"
+              aria-selected={tab === 'resultat'}
+              aria-controls="tabpanel-resultat"
+              className={`dash-pill-tab${tab === 'resultat' ? ' dash-pill-tab-active' : ''}`}
+              onClick={() => handleTab('resultat')}
+            >
+              Compte de résultat
+            </button>
+            <button
+              role="tab"
+              id="tab-bilan"
+              aria-selected={tab === 'bilan'}
+              aria-controls="tabpanel-bilan"
+              className={`dash-pill-tab${tab === 'bilan' ? ' dash-pill-tab-active' : ''}`}
+              onClick={() => handleTab('bilan')}
+            >
+              Bilan simplifié
+            </button>
           </div>
 
           {/* ── Compte de résultat ──────────────────────────────────────── */}
-          {tab === 'resultat' && (
-            <div className="dash-section">
-              <div className="dash-table-wrap"><table className="dash-table">
-                <tbody>
-                  <tr style={{ background: 'var(--offwhite)' }}>
-                    <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
-                      textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
-                      display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Produits — Chiffre d&apos;affaires HT</span>
-                      <Ref v="Formulaire 2052" />
-                    </td>
-                  </tr>
-                  {Object.entries(pnl.produits).map(([cat, montant]) => (
-                    <tr key={cat}>
-                      <td style={{ paddingLeft: 24 }}>{cat}</td>
-                      <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(montant)}</td>
+          <div role="tabpanel" id="tabpanel-resultat" aria-labelledby="tab-resultat">
+            {tab === 'resultat' && (
+              <div className="dash-section">
+                <div className="dash-table-wrap"><table className="dash-table">
+                  <caption className="sr-only">Compte de résultat — Produits et charges de la période {debut} au {fin}</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Libellé</th>
+                      <th scope="col" className="right">Montant HT</th>
                     </tr>
-                  ))}
-                  {Object.keys(pnl.produits).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucun produit sur cette période.</td></tr>}
-                  <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
-                    <td>Total produits <Ref v="2052 · FJ" /></td>
-                    <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_produits)}</td>
-                  </tr>
-
-                  <tr style={{ background: 'var(--offwhite)' }}>
-                    <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
-                      textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
-                      display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Charges — Dépenses HT</span>
-                      <Ref v="Formulaire 2052" />
-                    </td>
-                  </tr>
-                  {Object.entries(pnl.charges).map(([cat, montant]) => (
-                    <tr key={cat}>
-                      <td style={{ paddingLeft: 24 }}>{cat}</td>
-                      <td className="right" style={{ color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace' }}>{formatEur(montant)}</td>
+                  </thead>
+                  <tbody>
+                    <tr style={{ background: 'var(--offwhite)' }}>
+                      <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
+                        textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
+                        borderTop: '1px solid var(--rule)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Produits — Chiffre d&apos;affaires HT</span>
+                          <Ref v="Formulaire 2052" show={vueComptable} />
+                        </div>
+                      </td>
                     </tr>
-                  ))}
-                  {Object.keys(pnl.charges).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucune charge sur cette période.</td></tr>}
-                  <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
-                    <td>Total charges <Ref v="2052 · GM" /></td>
-                    <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_charges)}</td>
-                  </tr>
+                    {Object.entries(pnl.produits).map(([cat, montant]) => (
+                      <tr key={cat}>
+                        <td style={{ paddingLeft: 24 }}>{cat}</td>
+                        <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(montant)}</td>
+                      </tr>
+                    ))}
+                    {Object.keys(pnl.produits).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucun produit sur cette période.</td></tr>}
+                    <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
+                      <td>Total produits <Ref v="2052 · FJ" show={vueComptable} /></td>
+                      <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_produits)}</td>
+                    </tr>
 
-                  <tr style={{ fontWeight: 700, fontFamily: 'Courier Prime,monospace', background: pnl.resultat >= 0 ? '#f0fdf4' : '#fff5f5' }}>
-                    <td style={{ padding: '14px 12px', fontSize: 15 }}>
-                      Résultat net de l&apos;exercice {pnl.resultat >= 0 ? '(120)' : '(129)'}
-                      <Ref v="2053 · KG/KH" />
-                    </td>
-                    <td className="right" style={{ padding: '14px 12px', fontSize: 15, color: pnl.resultat >= 0 ? '#15803d' : '#dc2626' }}>
-                      {formatEur(pnl.resultat)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table></div>
-              <p style={{ marginTop: 12, fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)' }}>
-                Les mouvements de capitaux (Cl. 1), immobilisations (Cl. 2) et virements internes (58) sont exclus du compte de résultat — ils figurent au Bilan.
-              </p>
-            </div>
-          )}
+                    <tr style={{ background: 'var(--offwhite)' }}>
+                      <td colSpan={2} style={{ fontFamily: 'Courier Prime,monospace', fontSize: 11, letterSpacing: 2,
+                        textTransform: 'uppercase', color: 'var(--pencil)', padding: '8px 12px',
+                        borderTop: '1px solid var(--rule)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Charges — Dépenses HT</span>
+                          <Ref v="Formulaire 2052" show={vueComptable} />
+                        </div>
+                      </td>
+                    </tr>
+                    {Object.entries(pnl.charges).map(([cat, montant]) => (
+                      <tr key={cat}>
+                        <td style={{ paddingLeft: 24 }}>{cat}</td>
+                        <td className="right" style={{ color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace' }}>{formatEur(montant)}</td>
+                      </tr>
+                    ))}
+                    {Object.keys(pnl.charges).length === 0 && <tr><td colSpan={2} className="dash-empty">Aucune charge sur cette période.</td></tr>}
+                    <tr style={{ fontWeight: 700, borderTop: '2px solid var(--ink)' }}>
+                      <td>Total charges <Ref v="2052 · GM" show={vueComptable} /></td>
+                      <td className="right" style={{ fontFamily: 'Courier Prime,monospace' }}>{formatEur(pnl.total_charges)}</td>
+                    </tr>
+
+                    <tr style={{ fontWeight: 700, fontFamily: 'Courier Prime,monospace', background: pnl.resultat >= 0 ? '#f0fdf4' : '#fff5f5' }}>
+                      <td style={{ padding: '14px 12px', fontSize: 15 }}>
+                        Résultat net de l&apos;exercice {pnl.resultat >= 0 ? '(120)' : '(129)'}
+                        <Ref v="2053 · KG/KH" show={vueComptable} />
+                      </td>
+                      <td className="right" style={{ padding: '14px 12px', fontSize: 15, color: pnl.resultat >= 0 ? '#15803d' : '#dc2626' }}>
+                        {formatEur(pnl.resultat)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table></div>
+                <p style={{ marginTop: 12, fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)' }}>
+                  Les mouvements de capitaux (Cl. 1), immobilisations (Cl. 2) et virements internes (58) sont exclus du compte de résultat — ils figurent au Bilan.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* ── Bilan ───────────────────────────────────────────────────── */}
-          {tab === 'bilan' && <BilanTab debut={debut} fin={fin} bilan={bilan} />}
+          <div role="tabpanel" id="tabpanel-bilan" aria-labelledby="tab-bilan">
+            {tab === 'bilan' && <BilanTab debut={debut} fin={fin} bilan={bilan} vueComptable={vueComptable} />}
+          </div>
         </>
       )}
     </div>
