@@ -32,8 +32,9 @@ export async function middleware(request: NextRequest) {
   const isPublic = PUBLIC_ROUTES.has(pathname) || pathname.startsWith('/invite/')
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register') ||
     pathname.startsWith('/mot-de-passe-oublie')
+  const isAdmin = pathname.startsWith('/admin')
 
-  if (!user && !isAuthRoute && !isPublic) {
+  if (!user && !isAuthRoute && !isPublic && !isAdmin) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

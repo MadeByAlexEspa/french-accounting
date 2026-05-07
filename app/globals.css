@@ -1696,3 +1696,25 @@ body {
 }
 @media (max-width: 600px) { .fp-panel { width: 100vw; } }
 .dash-alert-action { font-family: 'Courier Prime', monospace; font-size: 11px; color: var(--ink); text-decoration: underline; white-space: nowrap; align-self: center; }
+
+/* ── Admin back-office ──────────────────────────────────────────────────────── */
+.adm-login-card {
+  background: var(--paper); border: 1px solid var(--rule);
+  padding: 40px 36px; width: 360px; display: flex; flex-direction: column; gap: 20px;
+}
+.adm-login-brand {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Special Elite', serif; font-size: 16px; color: var(--ink);
+}
+.adm-login-title { font-family: 'Special Elite', serif; font-size: 24px; color: var(--ink); margin: 0; }
+.adm-login-error {
+  background: #fee2e2; border: 1px solid #f87171; color: #991b1b;
+  padding: 8px 12px; font-size: 13px; border-radius: 2px;
+}
+.adm-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 32px; border-bottom: 1px solid var(--rule); background: var(--paper);
+  position: sticky; top: 0; z-index: 10;
+}
+.adm-header-title { font-family: 'Special Elite', serif; font-size: 18px; color: var(--ink); }
+.adm-page { max-width: 1100px; margin: 0 auto; padding: 32px 32px; }
