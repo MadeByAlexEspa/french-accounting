@@ -427,6 +427,45 @@ export interface Database {
         }
         Relationships: []
       }
+      feedbacks: {
+        Row: {
+          id: number
+          content: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: number
+          content: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: number
+          content?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      feedback_votes: {
+        Row: {
+          feedback_id: number
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          feedback_id: number
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          feedback_id?: number
+          user_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -449,3 +488,5 @@ export type QontoImport    = Database['public']['Tables']['qonto_imports']['Row'
 export type QontoSyncLog   = Database['public']['Tables']['qonto_sync_log']['Row']
 export type ShineAccount   = Database['public']['Tables']['shine_accounts']['Row']
 export type ShineImport    = Database['public']['Tables']['shine_imports']['Row']
+export type Feedback       = Database['public']['Tables']['feedbacks']['Row']
+export type FeedbackVote   = Database['public']['Tables']['feedback_votes']['Row']

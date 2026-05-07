@@ -22,6 +22,8 @@ const NAV_ITEMS: Item[] = [
   { id: 'integrations', label: 'Connexions API',    sub: 'Qonto, Shine…',        href: '/integrations',             glyph: '⟳' },
   { id: 'workspace',    label: 'Paramètres',        sub: 'Workspace, équipe',    href: '/workspace',                glyph: <Settings size={14} /> },
   { id: 'new-entry',    label: 'Nouvelle entrée',   sub: 'Raccourci: N',         href: '/transactions?tab=entrees', glyph: '+' },
+  { id: 'feedback',     label: 'Feedback',           sub: 'Suggestions & votes',  glyph: '💬',
+    action: () => { setTimeout(() => window.dispatchEvent(new CustomEvent('open-feedback')), 50) } },
 ]
 
 export default function CommandPalette() {

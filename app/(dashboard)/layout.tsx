@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/Sidebar'
 import CommandPalette from '@/components/CommandPalette'
+import FeedbackPanel from '@/components/FeedbackPanel'
 import type { Workspace } from '@/lib/types/database'
 
 type MembershipWithWorkspace = {
@@ -40,6 +41,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </main>
       <CommandPalette />
+      <FeedbackPanel />
     </div>
   )
 }

@@ -1648,4 +1648,51 @@ body {
   text-decoration: none;
   border-bottom: 1px solid var(--ink);
 }
+
+/* ── Feedback Panel ─────────────────────────────────────────────────────────── */
+.fp-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.25); z-index: 200; }
+.fp-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 100vw;
+  background: var(--paper); border-left: 1px solid var(--rule);
+  display: flex; flex-direction: column; z-index: 201;
+}
+.fp-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--rule); flex-shrink: 0;
+}
+.fp-title { font-family: 'Special Elite', serif; font-size: 16px; color: var(--ink); }
+.fp-close {
+  background: none; border: none; cursor: pointer; font-size: 16px;
+  color: var(--pencil); padding: 4px 6px; line-height: 1;
+}
+.fp-close:hover { color: var(--ink); }
+.fp-body { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 0; }
+.fp-form { display: flex; flex-direction: column; }
+.fp-textarea {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--border, var(--rule)); border-radius: 2px;
+  padding: 8px 12px; font-family: Inter, sans-serif; font-size: 13px;
+  color: var(--ink); background: var(--paper); resize: vertical;
+  outline: none;
+}
+.fp-textarea:focus { border-color: var(--ink); }
+.fp-divider { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
+.fp-item {
+  padding: 12px 0; border-bottom: 1px solid var(--rule);
+}
+.fp-item:last-child { border-bottom: none; }
+.fp-item-content { font-size: 13px; color: var(--ink); margin: 0 0 8px; line-height: 1.5; }
+.fp-item-meta { display: flex; align-items: center; justify-content: space-between; }
+.fp-vote-btn {
+  background: none; border: 1px solid var(--rule); border-radius: 4px;
+  cursor: pointer; font-size: 11px; font-family: 'Courier Prime', monospace;
+  color: var(--pencil); padding: 2px 8px; line-height: 1.4; transition: none;
+}
+.fp-vote-btn:hover { border-color: var(--ink); color: var(--ink); }
+.fp-vote-btn-active { background: var(--ink); color: var(--paper) !important; border-color: var(--ink); }
+.fp-footer {
+  padding: 12px 20px; border-top: 1px solid var(--rule);
+  text-align: center; flex-shrink: 0;
+}
+@media (max-width: 600px) { .fp-panel { width: 100vw; } }
 .dash-alert-action { font-family: 'Courier Prime', monospace; font-size: 11px; color: var(--ink); text-decoration: underline; white-space: nowrap; align-self: center; }

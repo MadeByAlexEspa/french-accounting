@@ -92,6 +92,14 @@ export default function Sidebar({ workspace, userEmail, userName }: Props) {
         <div style={{ padding: '4px 12px 8px', fontSize: 11, color: 'var(--pencil)', fontFamily: "'Courier Prime', monospace" }}>
           <kbd className="dash-kbd" style={{ fontSize: 10 }}>⌘K</kbd> palette
         </div>
+        <button
+          className="sb-item"
+          style={{ borderLeft: '3px solid transparent' }}
+          onClick={() => window.dispatchEvent(new CustomEvent('open-feedback'))}
+        >
+          <span style={{ fontSize: 13, flexShrink: 0 }}>💬</span>
+          Feedback
+        </button>
         <button onClick={handleLogout} className="sb-item" style={{ borderLeft: '3px solid transparent' }}>
           <LogOut size={15} style={{ flexShrink: 0 }} />
           Déconnexion
