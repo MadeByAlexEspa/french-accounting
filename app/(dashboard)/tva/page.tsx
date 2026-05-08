@@ -533,8 +533,18 @@ export default function TVAPage() {
       const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
       if (!m) { setError('Workspace introuvable.'); return }
       const [{ data: f, error: fe }, { data: d, error: de }, { data: wsData }] = await Promise.all([
-        supabase.from('factures').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }),
-        supabase.from('depenses').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }),
+        supabase.from('factures')
+          .select('id, date, client, montant_ht, taux_tva, montant_tva, montant_ttc, tva_lines, statut, categorie, numero, bank_source, has_attachment')
+          .eq('workspace_id', m.workspace_id)
+          .gte('date', `${year}-01-01`)
+          .lte('date', `${year}-12-31`)
+          .order('date', { ascending: false }),
+        supabase.from('depenses')
+          .select('id, date, fournisseur, description, montant_ht, taux_tva, montant_tva, montant_ttc, tva_lines, statut, categorie, bank_source, has_attachment, push_status, push_target')
+          .eq('workspace_id', m.workspace_id)
+          .gte('date', `${year}-01-01`)
+          .lte('date', `${year}-12-31`)
+          .order('date', { ascending: false }),
         supabase.from('workspaces').select('structure_type, activite_type').eq('id', m.workspace_id).single(),
       ])
       if (fe || de) { setError((fe ?? de)?.message ?? 'Erreur'); return }
@@ -547,7 +557,7 @@ export default function TVAPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [year])
 
   useEffect(() => { load() }, [load])
 
@@ -660,7 +670,35 @@ export default function TVAPage() {
         </div>
       </div>
 
-      {loading && <div className="dash-loading">Chargement…</div>}
+      {loading && (
+        <div>
+          {/* Skeleton période selector */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+            {[100, 120, 100, 80].map((w, i) => (
+              <div key={i} className="dash-skeleton-line" style={{ width: w, height: 30, borderRadius: 4 }} />
+            ))}
+          </div>
+          {/* Skeleton KPI cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 24 }}>
+            {[1,2,3,4].map(i => (
+              <div key={i} className="dash-card" style={{ padding: 16 }}>
+                <div className="dash-skeleton-line" style={{ width: '60%', height: 11, marginBottom: 8 }} />
+                <div className="dash-skeleton-line" style={{ width: '80%', height: 22 }} />
+              </div>
+            ))}
+          </div>
+          {/* Skeleton table */}
+          <div className="dash-card" style={{ padding: 16 }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+                <div className="dash-skeleton-line" style={{ flex: 2, height: 14 }} />
+                <div className="dash-skeleton-line" style={{ flex: 1, height: 14 }} />
+                <div className="dash-skeleton-line" style={{ flex: 1, height: 14 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {error && <div className="dash-error">{error}</div>}
 
       {!loading && structureType === 'micro' && (() => {

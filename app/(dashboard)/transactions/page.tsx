@@ -170,7 +170,7 @@ function FactureModal({ initial, factures, workspaceId, activiteType, onSaved, o
 
   return (
     <div className="dash-modal-backdrop" onClick={onClose}>
-      <div className="dash-modal" onClick={e => e.stopPropagation()}>
+      <div className="dash-modal dash-modal-slide" onClick={e => e.stopPropagation()}>
         <div className="dash-modal-header">
           <h2 className="dash-modal-title">{initial ? 'Modifier l\'entrée' : 'Nouvelle entrée'}</h2>
           <button className="dash-modal-close" aria-label="Fermer" onClick={onClose}>×</button>
@@ -246,7 +246,7 @@ function DepenseModal({ initial, workspaceId, activiteType, onSaved, onClose }: 
 
   return (
     <div className="dash-modal-backdrop" onClick={onClose}>
-      <div className="dash-modal" onClick={e => e.stopPropagation()}>
+      <div className="dash-modal dash-modal-slide" onClick={e => e.stopPropagation()}>
         <div className="dash-modal-header">
           <h2 className="dash-modal-title">{initial ? 'Modifier la sortie' : 'Nouvelle sortie'}</h2>
           <button className="dash-modal-close" aria-label="Fermer" onClick={onClose}>×</button>
@@ -676,8 +676,8 @@ export default function TransactionsPage() {
       setWorkspaceId(m.workspace_id)
       const [{ data: ws }, { data: f, error: fe }, { data: d, error: de }] = await Promise.all([
         supabase.from('workspaces').select('activite_type, structure_type').eq('id', m.workspace_id).single(),
-        supabase.from('factures').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(500),
-        supabase.from('depenses').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(500),
+        supabase.from('factures').select('id, date, client, description, montant_ht, taux_tva, montant_tva, montant_ttc, tva_lines, statut, categorie, numero, bank_source, has_attachment').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(500),
+        supabase.from('depenses').select('id, date, fournisseur, description, montant_ht, taux_tva, montant_tva, montant_ttc, tva_lines, statut, categorie, bank_source, has_attachment, push_status, push_target').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(500),
       ])
       if (ws?.activite_type) setActiviteType(ws.activite_type)
       if (ws?.structure_type) setStructureType(ws.structure_type)
