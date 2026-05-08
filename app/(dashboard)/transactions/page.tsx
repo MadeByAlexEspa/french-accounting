@@ -622,6 +622,7 @@ export default function TransactionsPage() {
   const [depenses, setDepenses] = useState<Depense[]>([])
   const [workspaceId, setWorkspaceId] = useState('')
   const [activiteType, setActiviteType] = useState<string | null>(null)
+  const [structureType, setStructureType] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -674,11 +675,12 @@ export default function TransactionsPage() {
       if (!m) { setError('Workspace introuvable'); return }
       setWorkspaceId(m.workspace_id)
       const [{ data: ws }, { data: f, error: fe }, { data: d, error: de }] = await Promise.all([
-        supabase.from('workspaces').select('activite_type').eq('id', m.workspace_id).single(),
+        supabase.from('workspaces').select('activite_type, structure_type').eq('id', m.workspace_id).single(),
         supabase.from('factures').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(500),
         supabase.from('depenses').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(500),
       ])
       if (ws?.activite_type) setActiviteType(ws.activite_type)
+      if (ws?.structure_type) setStructureType(ws.structure_type)
       if (fe || de) { setError((fe ?? de)?.message ?? 'Erreur de chargement'); return }
       setFactures((f ?? []) as Facture[])
       setDepenses((d ?? []) as Depense[])
@@ -718,9 +720,10 @@ export default function TransactionsPage() {
     [allRows]
   )
 
-  const baseRows = tab === 'tous' ? allRows
+  const baseRows = useMemo<AnyRow[]>(() => tab === 'tous' ? allRows
     : tab === 'entrees' ? factures.map(f => ({ ...f, _type: 'entree' as const, _key: `entree-${f.id}` }))
-    : depenses.map(d => ({ ...d, _type: 'sortie' as const, _key: `sortie-${d.id}` }))
+    : depenses.map(d => ({ ...d, _type: 'sortie' as const, _key: `sortie-${d.id}` })),
+  [tab, allRows, factures, depenses])
 
   const catOptions = useMemo(() => [...new Set(baseRows.map(r => r.categorie).filter(Boolean))].sort(), [baseRows])
 
@@ -993,6 +996,16 @@ export default function TransactionsPage() {
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 6, fontSize: 12, color: '#92400e' }}>
               <AlertTriangle size={12} />
               {alertCount} transaction{alertCount > 1 ? 's' : ''} avec TVA à vérifier
+            </div>
+          )}
+          {structureType === 'micro' && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '4px 10px', marginBottom: 12,
+              background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6,
+              fontSize: 12, color: '#166534', fontFamily: 'Courier Prime,monospace',
+            }}>
+              Micro-entrepreneur — Franchise TVA : mentionner &laquo;TVA non applicable — art. 293 B du CGI&raquo; sur vos factures
             </div>
           )}
         </div>
@@ -1289,7 +1302,7 @@ export default function TransactionsPage() {
 
       {/* Email modal */}
       {emailTarget && typeof document !== 'undefined' && createPortal(
-        <div className="dash-modal-overlay" onClick={() => setEmailTarget(null)}>
+        <div className="dash-modal-backdrop" onClick={() => setEmailTarget(null)}>
           <div className="dash-modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
             <div className="dash-modal-header">
               <h3 className="dash-modal-title">Envoyer la facture</h3>
@@ -1301,7 +1314,7 @@ export default function TransactionsPage() {
               </p>
               <input
                 type="email"
-                className="dash-input"
+                className="dash-field-input"
                 placeholder="email@client.fr"
                 value={emailInput}
                 onChange={e => setEmailInput(e.target.value)}

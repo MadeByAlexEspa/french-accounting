@@ -58,7 +58,7 @@ export default async function DashboardHome({
   const debut = `${year}-01-01`
   const fin   = `${year}-12-31`
 
-  const [{ data: factures }, { data: depenses }] = await Promise.all([
+  const [{ data: factures }, { data: depenses }, { data: wsData }] = await Promise.all([
     supabase
       .from('factures')
       .select('montant_ht, montant_tva, montant_ttc, statut, taux_tva, tva_lines, date')
@@ -71,6 +71,11 @@ export default async function DashboardHome({
       .eq('workspace_id', m.workspace_id)
       .gte('date', debut)
       .lte('date', fin),
+    supabase
+      .from('workspaces')
+      .select('structure_type, activite_type')
+      .eq('id', m.workspace_id)
+      .single(),
   ])
 
   const f = factures ?? []
@@ -108,6 +113,18 @@ export default async function DashboardHome({
   const chargesSurCA = ca > 0 ? Math.round(charges / ca * 1000) / 10 : null
   const dettesF      = round2(d.filter(r => r.statut === 'en_attente').reduce((s, r) => s + r.montant_ttc, 0))
   const bfr          = round2(impayees - dettesF)
+
+  // Micro-entrepreneur
+  const isMicro = wsData?.structure_type === 'micro'
+  const activiteMicro = wsData?.activite_type ?? ''
+  const seuilMajore    = activiteMicro === 'micro_bic_marchandises' ? 93500 : 41250
+  const cotisationRate = activiteMicro === 'micro_bic_marchandises' ? 0.123 : 0.212
+  const anneeEnCours = new Date().getFullYear()
+  const caAnnuel = (factures ?? [])
+    .filter(r => new Date(r.date).getFullYear() === anneeEnCours)
+    .reduce((s, r) => s + r.montant_ht, 0)
+  const cotisationsEstimees = round2(caAnnuel * cotisationRate)
+  const tauxRemplissage = Math.min(100, Math.round(caAnnuel / seuilMajore * 100))
 
   // Alert: TVA declaration deadline (within 15 days of end of quarter)
   const m0 = today.getMonth() // 0-based
@@ -223,6 +240,57 @@ export default async function DashboardHome({
           </p>
         </div>
       </div>
+
+      {/* Micro-entrepreneur */}
+      {isMicro && (
+        <div className="dash-card" style={{ marginBottom: 24 }}>
+          <div className="dash-card-title">Micro-entrepreneur</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginTop: 12 }}>
+            {/* CA vs seuil franchise TVA */}
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                CA {anneeEnCours} vs seuil franchise TVA
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Courier Prime,monospace' }}>
+                {fmt(caAnnuel)}
+                <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--pencil)', marginLeft: 6 }}>
+                  / {fmt(seuilMajore)}
+                </span>
+              </div>
+              {/* Barre de progression */}
+              <div style={{ height: 4, background: 'var(--rule)', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${tauxRemplissage}%`,
+                  background: tauxRemplissage >= 90 ? '#dc2626' : tauxRemplissage >= 70 ? '#f59e0b' : '#16a34a',
+                  borderRadius: 2,
+                  transition: 'width 0.3s ease',
+                }} />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace', marginTop: 4 }}>
+                {tauxRemplissage < 70
+                  ? `Franchise TVA active — seuil majoré : ${fmt(seuilMajore)}`
+                  : tauxRemplissage < 90
+                  ? `Attention : ${tauxRemplissage}% du seuil majoré atteint`
+                  : `Seuil majoré bientôt atteint — vérifiez votre obligation TVA`}
+              </div>
+            </div>
+
+            {/* Cotisations URSSAF estimées */}
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Cotisations URSSAF estimées
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Courier Prime,monospace' }}>
+                {fmt(cotisationsEstimees)}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace', marginTop: 4 }}>
+                {Math.round(cotisationRate * 100 * 10) / 10}% du CA HT — estimation sur {anneeEnCours}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Ratios de gestion */}
       <div className="dash-card" style={{ marginTop: 8 }}>

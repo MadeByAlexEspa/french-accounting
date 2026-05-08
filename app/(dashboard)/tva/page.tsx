@@ -505,6 +505,8 @@ export default function TVAPage() {
   const [deductibleModal, setDeductibleModal] = useState<string | null>(null)
   const [fPage, setFPage] = useState(0)
   const [dPage, setDPage] = useState(0)
+  const [structureType,  setStructureType]  = useState<string | null>(null)
+  const [activiteMicro,  setActiviteMicro]  = useState<string | null>(null)
 
   // Restore period from localStorage after hydration
   useEffect(() => {
@@ -530,13 +532,18 @@ export default function TVAPage() {
       if (!user) { setError('Session expirée — rechargez la page.'); return }
       const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
       if (!m) { setError('Workspace introuvable.'); return }
-      const [{ data: f, error: fe }, { data: d, error: de }] = await Promise.all([
+      const [{ data: f, error: fe }, { data: d, error: de }, { data: wsData }] = await Promise.all([
         supabase.from('factures').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }),
         supabase.from('depenses').select('*').eq('workspace_id', m.workspace_id).order('date', { ascending: false }),
+        supabase.from('workspaces').select('structure_type, activite_type').eq('id', m.workspace_id).single(),
       ])
       if (fe || de) { setError((fe ?? de)?.message ?? 'Erreur'); return }
       setFactures((f ?? []) as Facture[])
       setDepenses((d ?? []) as Depense[])
+      if (wsData) {
+        setStructureType(wsData.structure_type)
+        setActiviteMicro(wsData.activite_type)
+      }
     } finally {
       setLoading(false)
     }
@@ -588,20 +595,22 @@ export default function TVAPage() {
   // ── Filtered detail rows ────────────────────────────────────────────────────
 
   const ff = useMemo(() => {
-    setFPage(0)
     let rows = data.detail_factures.map(f => ({ ...f, _kind: 'entree' as const }))
     if (fSearch) { const q = fSearch.toLowerCase(); rows = rows.filter(r => r.client.toLowerCase().includes(q)) }
     if (fTaux) rows = rows.filter(r => String(r.taux_tva) === fTaux)
     return rows
   }, [data.detail_factures, fSearch, fTaux])
 
+  useEffect(() => { setFPage(0) }, [fSearch, fTaux])
+
   const fd = useMemo(() => {
-    setDPage(0)
     let rows = data.detail_depenses.map(d => ({ ...d, _kind: 'sortie' as const }))
     if (dSearch) { const q = dSearch.toLowerCase(); rows = rows.filter(r => r.fournisseur.toLowerCase().includes(q)) }
     if (dTaux) rows = rows.filter(r => String(r.taux_tva) === dTaux)
     return rows
   }, [data.detail_depenses, dSearch, dTaux])
+
+  useEffect(() => { setDPage(0) }, [dSearch, dTaux])
 
   const alertCount = useMemo(
     () => [...data.detail_factures, ...data.detail_depenses].filter(isTvaErronnee).length,
@@ -653,6 +662,27 @@ export default function TVAPage() {
 
       {loading && <div className="dash-loading">Chargement…</div>}
       {error && <div className="dash-error">{error}</div>}
+
+      {!loading && structureType === 'micro' && (() => {
+        const seuilMajore = activiteMicro === 'micro_bic_marchandises' ? 93500 : 41250
+        const caPeriode = data.collectee?.total_base_ht ?? 0
+        const isFranchise = caPeriode < seuilMajore
+        if (!isFranchise) return null
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 16px', marginBottom: 20,
+            background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6,
+            fontSize: 13, color: '#166534',
+          }}>
+            <span style={{ fontSize: 16 }}>✓</span>
+            <span>
+              <strong>Franchise en base de TVA</strong> — Vous n&apos;êtes pas assujetti à la TVA sur cette période (art. 293 B du CGI).
+              {' '}Seuil majoré : {seuilMajore.toLocaleString('fr-FR')} €. CA sur la période : {caPeriode.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}.
+            </span>
+          </div>
+        )
+      })()}
 
       {!loading && (
         <>

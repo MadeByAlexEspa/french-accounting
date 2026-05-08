@@ -23,7 +23,7 @@ import {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const ACTIVITE_OPTIONS = [
+const ACTIVITE_OPTIONS_STANDARD = [
   { value: '',              label: '— Non renseigné —' },
   { value: 'saas',         label: 'SaaS / Logiciel' },
   { value: 'conseil',      label: 'Conseil' },
@@ -32,6 +32,13 @@ const ACTIVITE_OPTIONS = [
   { value: 'formation',    label: 'Formation' },
   { value: 'immobilier',   label: 'Immobilier' },
   { value: 'autre',        label: 'Autre' },
+]
+
+const ACTIVITE_OPTIONS_MICRO = [
+  { value: '',                       label: '— Choisir le type —' },
+  { value: 'micro_bic_marchandises', label: 'BIC — Vente de marchandises' },
+  { value: 'micro_bic_services',     label: 'BIC — Prestations de services' },
+  { value: 'micro_bnc',              label: 'BNC — Professions libérales' },
 ]
 
 const STRUCTURE_OPTIONS = [
@@ -293,14 +300,32 @@ function WorkspaceProfileForm({ ws, onSaved }: { ws: WorkspaceData; onSaved: () 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="dash-field">
           <label className="dash-field-label" htmlFor="ws-activite">Type d&apos;activité</label>
-          <select
-            id="ws-activite"
-            className="dash-field-select"
-            value={activite}
-            onChange={e => { setActivite(e.target.value); setSuccess(null) }}
-          >
-            {ACTIVITE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          {(() => {
+            const activiteOptions = structure === 'micro' ? ACTIVITE_OPTIONS_MICRO : ACTIVITE_OPTIONS_STANDARD
+            return (
+              <>
+                <select
+                  id="ws-activite"
+                  className="dash-field-select"
+                  value={activite}
+                  onChange={e => { setActivite(e.target.value); setSuccess(null) }}
+                >
+                  {activiteOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                {structure === 'micro' && activite && (
+                  <p style={{ fontSize: 11, color: 'var(--pencil)', fontFamily: 'Courier Prime,monospace', margin: '4px 0 0' }}>
+                    {activite === 'micro_bic_marchandises'
+                      ? 'Seuil franchise TVA : 85 000 € (majoré 93 500 €) — Cotisations URSSAF : 12,3 % du CA'
+                      : activite === 'micro_bic_services'
+                      ? 'Seuil franchise TVA : 37 500 € (majoré 41 250 €) — Cotisations URSSAF : 21,2 % du CA'
+                      : activite === 'micro_bnc'
+                      ? 'Seuil franchise TVA : 37 500 € (majoré 41 250 €) — Cotisations URSSAF : 21,2 % du CA'
+                      : ''}
+                  </p>
+                )}
+              </>
+            )
+          })()}
         </div>
         <div className="dash-field">
           <label className="dash-field-label" htmlFor="ws-structure">Type de structure</label>
