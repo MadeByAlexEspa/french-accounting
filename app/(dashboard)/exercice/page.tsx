@@ -161,6 +161,65 @@ function computeBilan(factures: Facture[], depenses: Depense[], debut: string, f
   }
 }
 
+// ── Cash-flow computation ─────────────────────────────────────────────────────
+
+interface CashFlowData {
+  encaissements_clients: number
+  decaissements_fournisseurs: number
+  flux_operationnel: number
+  acquisitions_immo: number
+  flux_investissement: number
+  apports_capital: number
+  mouvements_exploitant: number
+  mouvements_emprunts: number
+  mouvements_cca: number
+  flux_financement: number
+  variation_tresorerie: number
+  tresorerie_debut: number
+  tresorerie_fin: number
+}
+
+function computeCashFlow(factures: Facture[], depenses: Depense[], debut: string, fin: string): CashFlowData {
+  const pF = factures.filter(f => f.date >= debut && f.date <= fin && f.statut === 'payee')
+  const pD = depenses.filter(d => d.date >= debut && d.date <= fin && d.statut === 'payee')
+
+  const encaissements_clients = round2(pF.filter(f => !isBilanCat(f.categorie)).reduce((s, f) => s + f.montant_ttc, 0))
+  const decaissements_fournisseurs = round2(pD.filter(d => !isBilanCat(d.categorie) && !isImmobi(d.categorie)).reduce((s, d) => s + d.montant_ttc, 0))
+  const flux_operationnel = round2(encaissements_clients - decaissements_fournisseurs)
+
+  const acquisitions_immo = round2(pD.filter(d => isImmobi(d.categorie)).reduce((s, d) => s + d.montant_ttc, 0))
+  const flux_investissement = round2(-acquisitions_immo)
+
+  const apports_capital = round2(pF.filter(f => isCapital(f.categorie)).reduce((s, f) => s + f.montant_ht, 0))
+  const apports_exploit = round2(pF.filter(f => isCompteExploit(f.categorie)).reduce((s, f) => s + f.montant_ht, 0))
+  const prelevements_exploit = round2(pD.filter(d => isCompteExploit(d.categorie)).reduce((s, d) => s + d.montant_ht, 0))
+  const mouvements_exploitant = round2(apports_exploit - prelevements_exploit)
+  const emprunts_recus = round2(pF.filter(f => isEmprunt(f.categorie)).reduce((s, f) => s + f.montant_ht, 0))
+  const emprunts_rembourses = round2(pD.filter(d => isEmprunt(d.categorie)).reduce((s, d) => s + d.montant_ht, 0))
+  const mouvements_emprunts = round2(emprunts_recus - emprunts_rembourses)
+  const cca_recus = round2(pF.filter(f => isCCA(f.categorie)).reduce((s, f) => s + f.montant_ht, 0))
+  const cca_rembourses = round2(pD.filter(d => isCCA(d.categorie)).reduce((s, d) => s + d.montant_ht, 0))
+  const mouvements_cca = round2(cca_recus - cca_rembourses)
+  const flux_financement = round2(apports_capital + mouvements_exploitant + mouvements_emprunts + mouvements_cca)
+
+  const variation_tresorerie = round2(flux_operationnel + flux_investissement + flux_financement)
+
+  const preF = factures.filter(f => f.date < debut && f.statut === 'payee')
+  const preD = depenses.filter(d => d.date < debut && d.statut === 'payee')
+  const tresorerie_debut = round2(
+    preF.reduce((s, f) => s + f.montant_ttc, 0) -
+    preD.reduce((s, d) => s + d.montant_ttc, 0)
+  )
+  const tresorerie_fin = round2(tresorerie_debut + variation_tresorerie)
+
+  return {
+    encaissements_clients, decaissements_fournisseurs, flux_operationnel,
+    acquisitions_immo, flux_investissement,
+    apports_capital, mouvements_exploitant, mouvements_emprunts, mouvements_cca, flux_financement,
+    variation_tresorerie, tresorerie_debut, tresorerie_fin,
+  }
+}
+
 // ── Export CSV (#4) ───────────────────────────────────────────────────────────
 
 function exportCSV(pnl: PnL, debut: string, fin: string) {
@@ -478,9 +537,104 @@ function BilanTab({ debut, fin, bilan, vueComptable }: { debut: string; fin: str
   )
 }
 
+// ── Flux de trésorerie components ────────────────────────────────────────────
+
+function FluxRow({ label, montant, indent, hide0, compte }: {
+  label: string; montant: number; indent?: boolean; hide0?: boolean; compte?: string
+}) {
+  if (hide0 && montant === 0) return null
+  const color = montant > 0 ? '#15803d' : montant < 0 ? '#dc2626' : undefined
+  const prefix = montant > 0 ? '+' : ''
+  return (
+    <tr>
+      <td style={{ paddingLeft: indent ? 28 : 12 }}>
+        {compte && <span style={{ fontSize: 10, fontFamily: 'Courier Prime,monospace', color: 'var(--pencil)', marginRight: 6 }}>{compte}</span>}
+        {label}
+      </td>
+      <td className="right" style={{ fontFamily: 'Courier Prime,monospace', color }}>{prefix}{formatEur(montant)}</td>
+    </tr>
+  )
+}
+
+function FluxTab({ cf }: { cf: CashFlowData }) {
+  const equilibre = Math.abs(cf.tresorerie_fin - (cf.tresorerie_debut + cf.variation_tresorerie)) < 0.02
+
+  return (
+    <>
+      <div className="dash-section">
+        <div className="dash-table-wrap">
+          <table className="dash-table">
+            <caption className="sr-only">Tableau des flux de trésorerie — méthode directe</caption>
+            <thead>
+              <tr>
+                <th scope="col">Libellé</th>
+                <th scope="col" className="right">Montant TTC</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Flux opérationnels */}
+              <GroupHeader label="Flux de trésorerie des activités opérationnelles" />
+              <FluxRow label="Encaissements clients (factures payées)" compte="(41)" montant={cf.encaissements_clients} indent hide0 />
+              <FluxRow label="Décaissements fournisseurs (dépenses payées)" compte="(40)" montant={-cf.decaissements_fournisseurs} indent hide0 />
+              {cf.encaissements_clients === 0 && cf.decaissements_fournisseurs === 0 && (
+                <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 28 }}>Aucun flux opérationnel sur cette période.</td></tr>
+              )}
+              <SubtotalRow label="Flux net — activités opérationnelles" montant={cf.flux_operationnel} />
+
+              {/* Flux investissement */}
+              <GroupHeader label="Flux de trésorerie des activités d'investissement" />
+              <FluxRow label="Acquisitions d'immobilisations" compte="(2x)" montant={-cf.acquisitions_immo} indent hide0 />
+              {cf.acquisitions_immo === 0 && (
+                <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 28 }}>Aucun investissement sur cette période.</td></tr>
+              )}
+              <SubtotalRow label="Flux net — activités d'investissement" montant={cf.flux_investissement} />
+
+              {/* Flux financement */}
+              <GroupHeader label="Flux de trésorerie des activités de financement" />
+              <FluxRow label="Apports en capital" compte="(101)" montant={cf.apports_capital} indent hide0 />
+              <FluxRow label="Mouvements compte exploitant (apports − prélèvements)" compte="(108)" montant={cf.mouvements_exploitant} indent hide0 />
+              <FluxRow label="Mouvements emprunts bancaires (reçus − remboursés)" compte="(164)" montant={cf.mouvements_emprunts} indent hide0 />
+              <FluxRow label="Mouvements comptes courants associés (reçus − remboursés)" compte="(455)" montant={cf.mouvements_cca} indent hide0 />
+              {cf.apports_capital === 0 && cf.mouvements_exploitant === 0 && cf.mouvements_emprunts === 0 && cf.mouvements_cca === 0 && (
+                <tr><td colSpan={2} className="dash-empty" style={{ paddingLeft: 28 }}>Aucun flux de financement sur cette période.</td></tr>
+              )}
+              <SubtotalRow label="Flux net — activités de financement" montant={cf.flux_financement} />
+            </tbody>
+            <tfoot>
+              <SubtotalRow label="VARIATION NETTE DE TRÉSORERIE" montant={cf.variation_tresorerie} bold />
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* Trésorerie début / fin */}
+      <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        {[
+          { label: 'Trésorerie d\'ouverture', value: cf.tresorerie_debut, sub: 'Solde cumulé avant la période' },
+          { label: 'Variation nette', value: cf.variation_tresorerie, sub: 'Opérationnel + Investissement + Financement', colored: true },
+          { label: 'Trésorerie de clôture', value: cf.tresorerie_fin, sub: 'Solde cumulé à la fin de la période', colored: true },
+        ].map(({ label, value, sub, colored }) => (
+          <div key={label} className="dash-card" style={{ padding: '14px 16px' }}>
+            <div style={{ fontFamily: 'Courier Prime,monospace', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--pencil)', marginBottom: 6 }}>{label}</div>
+            <div style={{ fontFamily: 'Courier Prime,monospace', fontSize: 18, fontWeight: 700, color: colored ? (value >= 0 ? '#15803d' : '#dc2626') : 'var(--ink)' }}>
+              {value >= 0 && colored ? '+' : ''}{formatEur(value)}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--pencil)', marginTop: 4 }}>{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <p style={{ marginTop: 12, fontFamily: 'Courier Prime,monospace', fontSize: 11, color: 'var(--pencil)', lineHeight: 1.7 }}>
+        Méthode directe · Flux opérationnels basés sur les transactions marquées «&nbsp;payée&nbsp;» · Les flux de financement (101, 108, 164, 455) utilisent le montant HT · Trésorerie d&apos;ouverture calculée depuis l&apos;origine des données.
+        {!equilibre && ' ⚠ Vérifiez la cohérence des montants TTC sur les catégories de bilan.'}
+      </p>
+    </>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'resultat' | 'bilan'
+type Tab = 'resultat' | 'bilan' | 'flux'
 const LS_EXERCICE = 'exercice_params'
 
 export default function ExercicePage() {
@@ -523,7 +677,7 @@ export default function ExercicePage() {
       const saved = JSON.parse(localStorage.getItem(LS_EXERCICE) ?? 'null')
       if (saved?.debut && saved?.fin) {
         setDebut(saved.debut); setFin(saved.fin)
-        if (saved.tab && saved.tab !== 'tendance') setTab(saved.tab)
+        if (saved.tab && ['resultat', 'bilan', 'flux'].includes(saved.tab)) setTab(saved.tab as Tab)
         if (saved.activePreset !== undefined) setActivePreset(saved.activePreset)
       }
     } catch { /* ignore */ }
@@ -640,8 +794,9 @@ export default function ExercicePage() {
     setCloturant(false)
   }
 
-  const pnl   = useMemo(() => computePnL(factures, depenses, debut, fin),            [factures, depenses, debut, fin])
-  const bilan = useMemo(() => computeBilan(factures, depenses, debut, fin, pnl.resultat), [factures, depenses, debut, fin, pnl.resultat])
+  const pnl      = useMemo(() => computePnL(factures, depenses, debut, fin),            [factures, depenses, debut, fin])
+  const bilan    = useMemo(() => computeBilan(factures, depenses, debut, fin, pnl.resultat), [factures, depenses, debut, fin, pnl.resultat])
+  const cashflow = useMemo(() => computeCashFlow(factures, depenses, debut, fin), [factures, depenses, debut, fin])
 
   // Feature #7 — N-1 PnL
   const pnlN1 = useMemo(() => {
@@ -834,6 +989,16 @@ export default function ExercicePage() {
               onClick={() => handleTab('bilan')}
             >
               Bilan simplifié
+            </button>
+            <button
+              role="tab"
+              id="tab-flux"
+              aria-selected={tab === 'flux'}
+              aria-controls="tabpanel-flux"
+              className={`dash-pill-tab${tab === 'flux' ? ' dash-pill-tab-active' : ''}`}
+              onClick={() => handleTab('flux')}
+            >
+              Flux de trésorerie
             </button>
           </div>
 
@@ -1054,6 +1219,11 @@ export default function ExercicePage() {
           {/* ── Bilan ───────────────────────────────────────────────────── */}
           <div role="tabpanel" id="tabpanel-bilan" aria-labelledby="tab-bilan">
             {tab === 'bilan' && <BilanTab debut={debut} fin={fin} bilan={bilan} vueComptable={vueComptable} />}
+          </div>
+
+          {/* ── Flux de trésorerie ──────────────────────────────────────── */}
+          <div role="tabpanel" id="tabpanel-flux" aria-labelledby="tab-flux">
+            {tab === 'flux' && <FluxTab cf={cashflow} />}
           </div>
         </>
       )}
