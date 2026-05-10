@@ -540,7 +540,7 @@ export default function TVAPage() {
           .lte('date', `${year}-12-31`)
           .order('date', { ascending: false }),
         supabase.from('depenses')
-          .select('id, date, fournisseur, description, montant_ht, taux_tva, montant_tva, montant_ttc, tva_lines, statut, categorie, bank_source, has_attachment')
+          .select('id, date, fournisseur, description, montant_ht, taux_tva, montant_tva, montant_ttc, tva_lines, statut, categorie, bank_source, has_attachment, push_status, push_target')
           .eq('workspace_id', m.workspace_id)
           .gte('date', `${year}-01-01`)
           .lte('date', `${year}-12-31`)

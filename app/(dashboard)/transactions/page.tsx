@@ -677,7 +677,7 @@ export default function TransactionsPage() {
       const [{ data: ws }, { data: f, error: fe }, { data: d, error: de }] = await Promise.all([
         supabase.from('workspaces').select('activite_type, structure_type').eq('id', m.workspace_id).single(),
         supabase.from('factures').select('id, date, client, description, montant_ht, taux_tva, montant_tva, montant_ttc, tva_lines, statut, categorie, numero, bank_source, has_attachment').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(500),
-        supabase.from('depenses').select('id, date, fournisseur, description, montant_ht, taux_tva, montant_tva, montant_ttc, tva_lines, statut, categorie, bank_source, has_attachment').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(500),
+        supabase.from('depenses').select('id, date, fournisseur, description, montant_ht, taux_tva, montant_tva, montant_ttc, tva_lines, statut, categorie, bank_source, has_attachment, push_status, push_target').eq('workspace_id', m.workspace_id).order('date', { ascending: false }).limit(500),
       ])
       if (ws?.activite_type) setActiviteType(ws.activite_type)
       if (ws?.structure_type) setStructureType(ws.structure_type)
