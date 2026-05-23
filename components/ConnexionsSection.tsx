@@ -64,7 +64,6 @@ function ReconciliationSection() {
       supabase.from('factures')
         .select('id, numero, date, client, montant_ttc, bank_source')
         .eq('workspace_id', m.workspace_id)
-        .eq('statut', 'en_attente')
         .in('bank_source', ['qonto', 'shine'])
         .order('date', { ascending: false })
         .limit(50),

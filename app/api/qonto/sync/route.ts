@@ -8,6 +8,7 @@ export async function POST(request: NextRequest) {
   let imported = 0
   let skipped = 0
   const errors: string[] = []
+  let apiError = false
 
   try {
     // Auth
@@ -52,6 +53,28 @@ export async function POST(request: NextRequest) {
     const key = account.secret_key
     const iban = account.iban
 
+    // Pre-load existing transaction IDs to avoid N+1 dedup queries in the loop
+    const { data: existingImports } = await svc
+      .from('qonto_imports')
+      .select('qonto_transaction_id')
+      .eq('workspace_id', workspaceId)
+    const existingIds = new Set((existingImports ?? []).map(r => r.qonto_transaction_id))
+
+    // Pre-fetch max QTO numero once to avoid per-transaction queries and race conditions
+    const { data: lastQto } = await svc
+      .from('factures')
+      .select('numero')
+      .eq('workspace_id', workspaceId)
+      .like('numero', 'QTO-%')
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    let nextQtoNum = 1
+    if (lastQto?.numero) {
+      const match = lastQto.numero.match(/QTO-(\d+)/)
+      if (match) nextQtoNum = parseInt(match[1], 10) + 1
+    }
+
     // Paginate transactions
     let currentPage = 1
     let hasMore = true
@@ -62,12 +85,22 @@ export async function POST(request: NextRequest) {
         url += `&filters[settled_at_from]=${encodeURIComponent(account.last_sync_at)}`
       }
 
-      const res = await fetch(url, {
-        headers: { Authorization: `${slug}:${key}` },
-      })
+      let res: Response
+      try {
+        res = await fetch(url, {
+          headers: { Authorization: `${slug}:${key}` },
+          signal: AbortSignal.timeout(30_000),
+        })
+      } catch (fetchErr: unknown) {
+        errors.push(`Réseau: ${fetchErr instanceof Error ? fetchErr.message : 'timeout ou erreur réseau'}`)
+        apiError = true
+        break
+      }
+
       if (!res.ok) {
-        const body = await res.text()
-        errors.push(`Qonto API ${res.status}: ${body.slice(0, 200)}`)
+        const resBody = await res.text()
+        errors.push(`Qonto API ${res.status}: ${resBody.slice(0, 200)}`)
+        apiError = true
         break
       }
 
@@ -78,15 +111,8 @@ export async function POST(request: NextRequest) {
 
       for (const tx of transactions) {
         try {
-          // Dedup
-          const { data: existing } = await svc
-            .from('qonto_imports')
-            .select('id')
-            .eq('workspace_id', workspaceId)
-            .eq('qonto_transaction_id', tx.transaction_id)
-            .maybeSingle()
-
-          if (existing) {
+          // In-memory dedup — avoids one DB query per transaction
+          if (existingIds.has(tx.transaction_id)) {
             skipped++
             continue
           }
@@ -139,21 +165,8 @@ export async function POST(request: NextRequest) {
           let localId: number
 
           if (side === 'credit') {
-            // Generate numero QTO-XXXXX
-            const { data: lastQto } = await svc
-              .from('factures')
-              .select('numero')
-              .eq('workspace_id', workspaceId)
-              .like('numero', 'QTO-%')
-              .order('id', { ascending: false })
-              .limit(1)
-              .maybeSingle()
-            let nextNum = 1
-            if (lastQto?.numero) {
-              const match = lastQto.numero.match(/QTO-(\d+)/)
-              if (match) nextNum = parseInt(match[1], 10) + 1
-            }
-            const numero = `QTO-${String(nextNum).padStart(5, '0')}`
+            // Use pre-fetched counter — no per-transaction query, no intra-sync duplicates
+            const numero = `QTO-${String(nextQtoNum).padStart(5, '0')}`
 
             const { data: inserted, error: insErr } = await svc
               .from('factures')
@@ -178,6 +191,7 @@ export async function POST(request: NextRequest) {
               errors.push(`Facture insert: ${insErr?.message ?? 'unknown'}`)
               continue
             }
+            nextQtoNum++
             localType = 'facture'
             localId = inserted.id
           } else {
@@ -207,7 +221,7 @@ export async function POST(request: NextRequest) {
             localId = inserted.id
           }
 
-          // Insert import record
+          // Insert import record and register in-memory to dedup remaining pages
           await svc.from('qonto_imports').insert({
             workspace_id: workspaceId,
             qonto_transaction_id: tx.transaction_id,
@@ -215,6 +229,7 @@ export async function POST(request: NextRequest) {
             local_id: localId,
             has_attachment: (tx.attachment_ids?.length ?? 0) > 0,
           })
+          existingIds.add(tx.transaction_id)
 
           imported++
         } catch (txErr: unknown) {
@@ -222,20 +237,26 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Pagination
+      // Pagination: use meta.next_page, fall back to count heuristic if meta is absent
       const meta = json.meta
+      const perPage: number = meta?.per_page ?? 100
       if (meta?.next_page) {
         currentPage = meta.next_page
+      } else if (!meta && transactions.length >= perPage) {
+        currentPage++
       } else {
         hasMore = false
       }
     }
 
-    // Update last_sync_at
-    await svc
-      .from('qonto_accounts')
-      .update({ last_sync_at: new Date().toISOString() })
-      .eq('id', accountId)
+    // Only advance last_sync_at when the API completed without errors — prevents silently
+    // skipping transactions on the next sync after a mid-pagination failure.
+    if (!apiError) {
+      await svc
+        .from('qonto_accounts')
+        .update({ last_sync_at: new Date().toISOString() })
+        .eq('id', accountId)
+    }
 
     // Insert sync log
     await svc.from('qonto_sync_log').insert({
