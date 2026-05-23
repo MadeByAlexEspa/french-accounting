@@ -665,14 +665,14 @@ export default function TransactionsPage() {
   const [emailSending, setEmailSending] = useState(false)
   const [emailResult, setEmailResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError(null) }
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setError('Session expirée'); return }
+      if (!user) { if (!silent) setError('Session expirée'); return }
       const { data: m } = await supabase.from('memberships').select('workspace_id').eq('user_id', user.id).single()
-      if (!m) { setError('Workspace introuvable'); return }
+      if (!m) { if (!silent) setError('Workspace introuvable'); return }
       setWorkspaceId(m.workspace_id)
       const [{ data: ws }, { data: f, error: fe }, { data: d, error: de }] = await Promise.all([
         supabase.from('workspaces').select('activite_type, structure_type').eq('id', m.workspace_id).single(),
@@ -681,10 +681,10 @@ export default function TransactionsPage() {
       ])
       if (ws?.activite_type) setActiviteType(ws.activite_type)
       if (ws?.structure_type) setStructureType(ws.structure_type)
-      if (fe || de) { setError((fe ?? de)?.message ?? 'Erreur de chargement'); return }
+      if (fe || de) { if (!silent) setError((fe ?? de)?.message ?? 'Erreur de chargement'); return }
       setFactures((f ?? []) as Facture[])
       setDepenses((d ?? []) as Depense[])
-    } finally { setLoading(false) }
+    } finally { if (!silent) setLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -768,7 +768,8 @@ export default function TransactionsPage() {
         setPendingCat({ row, newCategory: rawValue, matchingRows: matches, isEntree })
         if (isEntree) await supabase.from('factures').update({ categorie: rawValue }).eq('id', row.id)
         else await supabase.from('depenses').update({ categorie: rawValue }).eq('id', row.id)
-        await load()
+        if (isEntree) setFactures(fs => fs.map(f => f.id === row.id ? { ...f, categorie: rawValue } : f))
+        else setDepenses(ds => ds.map(d => d.id === row.id ? { ...d, categorie: rawValue } : d))
         return
       }
       patch = { categorie: rawValue }
@@ -791,14 +792,18 @@ export default function TransactionsPage() {
     const patch = { taux_tva: -1, montant_ht: totalHt, montant_tva: totalTva, tva_lines: lines }
     if (row._type === 'entree') await supabase.from('factures').update(patch).eq('id', row.id)
     else await supabase.from('depenses').update(patch).eq('id', row.id)
-    setSplitTarget(null); await load()
+    setSplitTarget(null)
+    if (row._type === 'entree') setFactures(fs => fs.map(f => f.id === row.id ? { ...f, ...patch } : f))
+    else setDepenses(ds => ds.map(d => d.id === row.id ? { ...d, ...patch } : d))
   }
 
   async function handleDelete(row: AnyRow) {
     const supabase = createClient()
     if (row._type === 'entree') await supabase.from('factures').delete().eq('id', row.id)
     else await supabase.from('depenses').delete().eq('id', row.id)
-    setConfirmDelete(null); await load()
+    setConfirmDelete(null)
+    if (row._type === 'entree') setFactures(fs => fs.filter(f => f.id !== row.id))
+    else setDepenses(ds => ds.filter(d => d.id !== row.id))
   }
 
   function exportCsv() {
@@ -846,9 +851,12 @@ export default function TransactionsPage() {
       )
     )
     const failed = results.filter(r => r.status === 'rejected').length
+    const deletedFactureIds = new Set([...selectedIds].filter(k => k.startsWith('entree-')).map(k => parseInt(k.slice(7))))
+    const deletedDepenseIds = new Set([...selectedIds].filter(k => k.startsWith('sortie-')).map(k => parseInt(k.slice(7))))
     setSelectedIds(new Set()); setConfirmBulkDelete(false); setBulkDeleting(false)
     if (failed) setActionError(`${failed} suppression(s) ont échoué.`)
-    await load()
+    setFactures(fs => fs.filter(f => !deletedFactureIds.has(f.id)))
+    setDepenses(ds => ds.filter(d => !deletedDepenseIds.has(d.id)))
   }
 
   async function handleSendEmail() {
@@ -871,7 +879,9 @@ export default function TransactionsPage() {
         if (isEntree) await supabase.from('factures').update({ categorie: newCategory }).eq('id', r.id)
         else await supabase.from('depenses').update({ categorie: newCategory }).eq('id', r.id)
       }
-      await load()
+      const ids = new Set(matchingRows.map(r => r.id))
+      if (isEntree) setFactures(fs => fs.map(f => ids.has(f.id) ? { ...f, categorie: newCategory } : f))
+      else setDepenses(ds => ds.map(d => ids.has(d.id) ? { ...d, categorie: newCategory } : d))
     } catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Erreur propagation') }
   }
 
@@ -1228,11 +1238,11 @@ export default function TransactionsPage() {
 
       {showForm && (tab === 'entrees' || (tab === 'tous' && editFact)) && (
         <FactureModal initial={editFact} factures={factures} workspaceId={workspaceId} activiteType={activiteType}
-          onSaved={() => { setShowForm(false); setEditFact(null); load() }} onClose={() => { setShowForm(false); setEditFact(null) }} />
+          onSaved={() => { setShowForm(false); setEditFact(null); load(true) }} onClose={() => { setShowForm(false); setEditFact(null) }} />
       )}
       {showForm && (tab === 'sorties' || (tab === 'tous' && editDep)) && (
         <DepenseModal initial={editDep} workspaceId={workspaceId} activiteType={activiteType}
-          onSaved={() => { setShowForm(false); setEditDep(null); load() }} onClose={() => { setShowForm(false); setEditDep(null) }} />
+          onSaved={() => { setShowForm(false); setEditDep(null); load(true) }} onClose={() => { setShowForm(false); setEditDep(null) }} />
       )}
 
       {splitTarget && (
